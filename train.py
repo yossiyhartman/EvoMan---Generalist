@@ -163,9 +163,14 @@ for _ in range(1):
 
 
 if settings["saveLogs"]:
+    printHeaders = True if not os.path.exists(settings["logfile"]) else False
+
     # Write to file
     with open(settings["logfile"], "a+") as f:
-        f.write(",".join([str(x) for x in logger.headers]) + "\n")
+
+        if printHeaders:
+            f.write(",".join([str(x) for x in logger.headers]) + "\n")
+
         for r in logs:
             data_log = ",".join([str(x) for x in r]) + "\n"
             f.write(data_log)
