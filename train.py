@@ -7,7 +7,7 @@ from demo_controller import player_controller
 from classes.Ga import Ga
 from classes.Logger import Logger
 
-
+# notebook settings
 settings = {
     "videoless": False,  # set to True to increase training
     "showTestRun": False,  # Show the training afterwards
@@ -15,17 +15,19 @@ settings = {
     "logfile": "./logs.txt",  # where to save the logs
 }
 
+
 ##############################
 ##### Initialize Environment
 ##############################
 
-if settings["videoless"]:
-    os.environ["SDL_VIDEODRIVER"] = "dummy"
-
+# Environment Settings
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
 enemies = [1, 2, 3, 4, 5, 6, 7, 8]
+
+if settings["videoless"]:
+    os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 
 env = Environment(
@@ -50,14 +52,9 @@ def evaluate(x):
     return np.array(list(map(lambda y: simulation(y), x)))
 
 
-def load_hyperparameters(file: str, n_genomes=None):
-    with open(file, "r") as f:
-        data = json.load(f)
-
-        if n_genomes:
-            data.update({"n_genomes": n_genomes})
-
-        return data
+##############################
+##### Initialize Data Tracking
+##############################
 
 
 def calc_statistics(fitness: np.array):
@@ -69,10 +66,6 @@ def calc_statistics(fitness: np.array):
     }
 
 
-##############################
-##### Initialize Data Tracking
-##############################
-
 headers = ["run id", "generation", "max.fitness", "mean.fitness", "min.fitness", "std.fitness", "set of enemies  "]
 logger = Logger(headers=headers)
 logs = []
@@ -80,6 +73,17 @@ logs = []
 ##############################
 ##### Initialize Hyper parameters
 ##############################
+
+
+def load_hyperparameters(file: str, n_genomes=None):
+    with open(file, "r") as f:
+        data = json.load(f)
+
+        if n_genomes:
+            data.update({"n_genomes": n_genomes})
+
+        return data
+
 
 hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_weights)
 
@@ -106,8 +110,12 @@ for _ in range(1):
     population_f = evaluate(population_w)
 
     log.update(
-        **{"run id": dt.datetime.today().strftime("%H:%M"), "generation": 0, "set of enemies  ": " ".join(str(e) for e in env.enemies)},
-        **calc_statistics(population_f),
+        {
+            "run id": dt.datetime.today().strftime("%H:%M"),
+            "generation": 0,
+            "set of enemies  ": " ".join(str(e) for e in env.enemies),
+            **calc_statistics(population_f),
+        },
     )
 
     logger.print_log(log.values())  # print values
@@ -146,12 +154,7 @@ for _ in range(1):
         run_best_w = population_w[best_idx]
         run_best_f = population_f[best_idx]
 
-        log.update(
-            **{
-                "generation": generation,
-            },
-            **calc_statistics(population_f),
-        )
+        log.update({"generation": generation, **calc_statistics(population_f)})
 
         logger.print_log(log.values())
         logs.append(log.values())  # save the values
