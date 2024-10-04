@@ -26,6 +26,14 @@ class Ga:
         mi, ma = np.min(x), np.max(x)
         return np.asarray([np.divide(k - mi, ma - mi) for k in x])
 
+    @classmethod
+    def bound(self, x):
+        if x > 2:
+            x = x
+        elif x < -2:
+            x = -2
+        return x
+
     ###################
     # INITIALIZING
     ###################

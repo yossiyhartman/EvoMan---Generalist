@@ -9,9 +9,9 @@ from classes.Logger import Logger
 
 # notebook settings
 settings = {
-    "videoless": False,  # set to True to increase training
+    "videoless": True,  # set to True to increase training
     "showTestRun": False,  # Show the training afterwards
-    "saveLogs": True,  # Save the logs to a file named logs
+    "saveLogs": False,  # Save the logs to a file named logs
     "logfile": "./logs.txt",  # where to save the logs
 }
 
@@ -24,7 +24,7 @@ settings = {
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
-enemies = [1, 2, 3, 4, 5, 6, 7, 8]
+enemies = [6, 7, 8]
 
 if settings["videoless"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -87,8 +87,49 @@ def load_hyperparameters(file: str, n_genomes=None):
 
 hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_weights)
 
+
 ##############################
-##### Initialize Simulation
+##### Feedback loop
+##############################
+
+
+# def update_hyperparameter(paramter:str = "", value:float = 0.1):
+#     hyper.update({paramter: value})
+#     pass
+
+
+def feedback_fitness(fitness: list = [], lookback: int = 5, threshold: float = 1, gen: int = 0):
+    global last_update
+
+    data = fitness[-lookback:]  # take last 'lookback' elements in fitenss array
+
+    if len(data) < lookback:
+        return
+
+    growth = np.max(data) - np.min(data)  # calculate absolute growth (> 0)
+
+    if (growth < threshold) and (gen - last_update) >= lookback:
+        last_update = gen
+        new_val = hyper["sigma.mutate"] + 0.25
+        hyper.update({"sigma.mutate": new_val})
+        print(f"\n updated hyperparamter sigma.mutate to {new_val} \n")
+
+
+metrics = ["max.fitness", "mean.fitness", "min.fitness", "std.fitness"]
+tracker = {k: [] for k in metrics}
+
+
+last_update = 0
+
+
+mean_fitness = []
+max_fitness = []
+min_fitness = []
+std_fitness = []
+
+
+##############################
+##### Start Simulation
 ##############################
 
 algo = Ga()
@@ -159,7 +200,19 @@ for _ in range(1):
         logger.print_log(log.values())
         logs.append(log.values())  # save the values
 
+        mean_fitness.append(np.round(np.mean(population_f), 2))
+        max_fitness.append(np.round(np.max(population_f), 2))
+        min_fitness.append(np.round(np.min(population_f), 2))
+        std_fitness.append(np.round(np.std(population_f), 2))
+
+        feedback_fitness(max_fitness, lookback=5, threshold=1, gen=generation)
+
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
+
+
+##############################
+##### Post Simulation
+##############################
 
 
 if settings["saveLogs"]:

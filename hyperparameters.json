@@ -2,7 +2,7 @@
     "n.weights": 265,
     "population.size": 60,
     "n.offspring": 2,
-    "n.generations": 30,
+    "n.generations": 75,
     "p.reproduce": 0.474,
     "p.mutate.individual": 0.5,
     "p.mutate.genome": 0.7,
