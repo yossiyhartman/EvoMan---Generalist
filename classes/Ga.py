@@ -27,10 +27,10 @@ class Ga:
         return np.asarray([np.divide(k - mi, ma - mi) for k in x])
 
     @classmethod
-    def bound(self, x):
-        if x > 2:
+    def bound(self, x, lb: int = 2, ub: int = 2):
+        if x > ub:
             x = x
-        elif x < -2:
+        elif x < lb:
             x = -2
         return x
 
@@ -143,6 +143,8 @@ class Ga:
             if np.random.rand() < p_mutation:
                 mutation_dist = np.random.uniform(0, 1, size=offspring.shape[1]) < p_genome
                 individual += mutation_dist * np.random.normal(0, sigma_mutation, size=offspring.shape[1])
+                individual = np.asarray(list(map(lambda x: self.bound(x), individual)))
+
         return offspring
 
     ###################
