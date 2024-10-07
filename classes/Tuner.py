@@ -14,27 +14,24 @@ class Tuner:
         self.tracker: Dict = {}
         self.last_update = 0
 
-    def updateHyperparameter(self, key: str, value: float, generation: int, lookback):
+    def readyforupdate(self, generation: int, lookback: int) -> bool:
+        return generation - self.last_update >= lookback
 
-        if generation - self.last_update >= lookback:
-            self.hyperparamters.update({key: value})
-            self.last_update = generation
+    def updateHyperparameter(self, key: str, value: float, generation: int, lookback):
+        self.hyperparamters.update({key: value})
+        self.last_update = generation
 
         return self.hyperparamters
 
     def hasProgressed(self, name: str, metrics: list, lookback: int, threshold: float) -> bool:
-
         vals = metrics[-lookback:]
-
-        print(vals, np.max(vals) - np.min(vals))
-
         return np.max(vals) - np.min(vals) > threshold
 
     def diversity_low(self, weights, threshold: float) -> bool:
         diversity = 0
         for i in range(weights.shape[1]):
             diversity += np.std(weights[:, i])
-        return np.std(weights) < threshold
+        return diversity < threshold
 
     def noMeanMaxDifference(self, mean_fitness, max_fitness, threshold):
         """

@@ -175,9 +175,14 @@ for _ in range(1):
 
         ## Apply tuning Logic
 
+        diversity = 0
+        for i in range(population_w.shape[1]):
+            diversity += np.std(population_w[:, i])
+        print('DIVERSITY:', diversity)
+        
         lookback = 3
 
-        if len(logs["max.fitness"]) >= lookback:
+        if len(logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
 
             if tuner.hasProgressed(name="max.fitness", metrics=logs["max.fitness"], lookback=lookback, threshold=10):
                 new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
@@ -187,9 +192,14 @@ for _ in range(1):
                 new_val = np.min([hyper["sigma.mutate"] + 0.10, 1.5])
                 hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
 
-            # if tuner.diversity_low(population_w, 0.1):
-            #     new_val = hyper["p.reproduce"] + 0.1
-            #     hyper.update({"p.reproduce": new_val})
+            if tuner.diversity_low(population_w, 160):
+                new_val = hyper["p.reproduce"] + 0.1
+                hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
+            
+            else:
+                new_val = hyper["p.reproduce"] - 0.1
+                hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
+                
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
