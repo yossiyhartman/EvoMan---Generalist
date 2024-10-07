@@ -71,7 +71,6 @@ def calc_statistics(fitness: np.array):
 
 headers = ["run id", "generation", "max.fitness", "mean.fitness", "min.fitness", "std.fitness", "set of enemies  "]
 logger = Logger(headers=headers)
-logs = {h: [] for h in headers}
 
 ##############################
 ##### Initialize Hyper parameters
@@ -128,10 +127,7 @@ for _ in range(1):
         },
     )
 
-    logger.print_log(log.values())  # print values
-
-    for k, v in log.items():
-        logs[k].append(v)
+    logger.save_log(log)  # print values
 
     # Start Evolving
     for generation in range(1, hyper["n.generations"] + 1):
@@ -168,38 +164,34 @@ for _ in range(1):
 
         log.update({"generation": generation, **calc_statistics(population_f)})
 
-        logger.print_log(log.values())  # print the values
-
-        for k, v in log.items():
-            logs[k].append(v)
+        logger.save_log(log)
 
         ## Apply tuning Logic
 
         diversity = 0
         for i in range(population_w.shape[1]):
             diversity += np.std(population_w[:, i])
-        print('DIVERSITY:', diversity)
-        
+        print("DIVERSITY:", diversity)
+
         lookback = 3
 
-        if len(logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
+        if len(logger.logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
 
-            if tuner.hasProgressed(name="max.fitness", metrics=logs["max.fitness"], lookback=lookback, threshold=10):
-                new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
-                hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+            #     if tuner.hasProgressed(name="max.fitness", metrics=logs["max.fitness"], lookback=lookback, threshold=10):
+            #         new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
+            #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
 
-            else:
-                new_val = np.min([hyper["sigma.mutate"] + 0.10, 1.5])
-                hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+            #     else:
+            #         new_val = np.min([hyper["sigma.mutate"] + 0.10, 1.5])
+            #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
 
             if tuner.diversity_low(population_w, 160):
                 new_val = hyper["p.reproduce"] + 0.1
                 hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
-            
+
             else:
                 new_val = hyper["p.reproduce"] - 0.1
                 hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
-                
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
@@ -215,13 +207,13 @@ if settings["saveLogs"]:
     # Write to file
     with open(settings["logfile"], "a+") as f:
 
-        log_length = max(len(values) for values in logs.values())
+        log_length = max(len(values) for values in logger.logs.values())
 
         if printHeaders:
             f.write(",".join([str(x) for x in logger.headers]) + "\n")
 
         for i in range(log_length):
-            line = [str(logs[key][i]) for key in logs.keys()]
+            line = [str(logger.logs[key][i]) for key in logger.logs.keys()]
             f.write(",".join(line) + "\n")
 
 # Show Test Run

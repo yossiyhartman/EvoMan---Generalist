@@ -38,9 +38,26 @@ class Ga:
     # INITIALIZING
     ###################
 
-    def initialize_population(self, population_size: int, n_genomes: int) -> np.array:
-        return np.random.uniform(low=-1, high=1, size=(population_size, n_genomes))
-        # return np.random.normal(size=(population_size, n_genomes))
+    def initialize_population(self, population_size: int, n_genomes: int, normal: bool = False) -> np.array:
+        if normal:
+            return np.random.normal(size=(population_size, n_genomes))
+        else:
+            return np.random.uniform(low=-1, high=1, size=(population_size, n_genomes))
+
+    ###################
+    # REPOPULATION
+    ###################
+
+    def repopulate(self, population: np.array, fitness: np.array, frac: float = 0.75):
+
+        _, n_genomes = population.shape
+        order = np.argsort(fitness)
+
+        discard_amount = int(np.ceil(population.shape[0] * frac))
+
+        new_pop = self.initialize_population(discard_amount, n_genomes)
+
+        return np.vstack((population[order][discard_amount:], new_pop))
 
     ###################
     # SELECTION
