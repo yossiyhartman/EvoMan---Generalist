@@ -149,7 +149,7 @@ class Ga:
     # CROSSOVER
     ###################
 
-    def crossover(self, parents: np.array, p: float = 0.5) -> np.array:
+    def crossover_2_offspring(self, parents: np.array, p: float = 0.5) -> np.array:
 
         total_offspring = []
 
@@ -168,9 +168,22 @@ class Ga:
             total_offspring.append(offspring[0])
             total_offspring.append(offspring[1])
 
-            # for child in offspring:
-            #     cross_distribution = np.random.uniform(0, 1)
-            #     child += cross_distribution * parents[i] + (1 - cross_distribution) * parents[i + 1]
-            #     total_offspring.append(child)
+        return np.asarray(total_offspring)
+
+    def crossover_n_offspring(parents: np.array, n_offspring: int = 4) -> np.array:
+
+        total_offspring = []
+
+        for i in range(0, parents.shape[0], 2):
+
+            n_gnomes = len(parents[i])
+
+            offspring = np.zeros(shape=(n_offspring, n_gnomes))
+
+            for child in offspring:
+                cross_distribution = np.random.uniform(0, 1, n_gnomes)
+                print(cross_distribution)
+                child += cross_distribution * parents[i] + (1 - cross_distribution) * parents[i + 1]
+                total_offspring.append(child)
 
         return np.asarray(total_offspring)

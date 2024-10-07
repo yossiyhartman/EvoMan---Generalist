@@ -4,14 +4,17 @@ import datetime as dt
 import numpy as np
 from evoman.environment import Environment
 from demo_controller import player_controller
+
+# Our classes
 from classes.Ga import Ga
 from classes.Logger import Logger
+from classes.Tuner import Tuner
 
 # notebook settings
 settings = {
     "videoless": True,  # set to True to increase training
     "showTestRun": False,  # Show the training afterwards
-    "saveLogs": False,  # Save the logs to a file named logs
+    "saveLogs": True,  # Save the logs to a file named logs
     "logfile": "./logs.txt",  # where to save the logs
 }
 
@@ -68,7 +71,7 @@ def calc_statistics(fitness: np.array):
 
 headers = ["run id", "generation", "max.fitness", "mean.fitness", "min.fitness", "std.fitness", "set of enemies  "]
 logger = Logger(headers=headers)
-logs = []
+logs = {h: [] for h in headers}
 
 ##############################
 ##### Initialize Hyper parameters
@@ -89,43 +92,42 @@ hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_we
 
 
 ##############################
-##### Feedback loop
+##### Tuner
 ##############################
 
+tuner = Tuner()
 
 # def update_hyperparameter(paramter:str = "", value:float = 0.1):
 #     hyper.update({paramter: value})
 #     pass
 
 
-def feedback_fitness(fitness: list = [], lookback: int = 5, threshold: float = 1, gen: int = 0):
-    global last_update
+# def feedback_fitness(fitness: list = [], lookback: int = 5, threshold: float = 1, gen: int = 0):
+#     global last_update
 
-    data = fitness[-lookback:]  # take last 'lookback' elements in fitenss array
+#     data = fitness[-lookback:]  # take last 'lookback' elements in fitenss array
 
-    if len(data) < lookback:
-        return
+#     if len(data) < lookback:
+#         return
 
-    growth = np.max(data) - np.min(data)  # calculate absolute growth (> 0)
+#     growth = np.max(data) - np.min(data)  # calculate absolute growth (> 0)
 
-    if (growth < threshold) and (gen - last_update) >= lookback:
-        last_update = gen
-        new_val = hyper["sigma.mutate"] + 0.25
-        hyper.update({"sigma.mutate": new_val})
-        print(f"\n updated hyperparamter sigma.mutate to {new_val} \n")
-
-
-metrics = ["max.fitness", "mean.fitness", "min.fitness", "std.fitness"]
-tracker = {k: [] for k in metrics}
+#     if (growth < threshold) and (gen - last_update) >= lookback:
+#         last_update = gen
+#         new_val = hyper["sigma.mutate"] + 0.25
+#         hyper.update({"sigma.mutate": new_val})
+#         print(f"\n updated hyperparamter sigma.mutate to {new_val} \n")
 
 
-last_update = 0
+# metrics = ["max.fitness", "mean.fitness", "min.fitness", "std.fitness"]
+# tracker = {k: [] for k in metrics}
 
+# last_update = 0
 
-mean_fitness = []
-max_fitness = []
-min_fitness = []
-std_fitness = []
+# mean_fitness = []
+# max_fitness = []
+# min_fitness = []
+# std_fitness = []
 
 
 ##############################
@@ -160,7 +162,11 @@ for _ in range(1):
     )
 
     logger.print_log(log.values())  # print values
-    logs.append(log.values())  # save the values
+
+    for k, v in log.items():
+        logs[k].append(v)
+
+    # logs.append(log.values())  # save the values
 
     # Start Evolving
     for generation in range(1, hyper["n.generations"] + 1):
@@ -169,7 +175,7 @@ for _ in range(1):
         parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
 
         # CROSSOVER
-        offspring_w = algo.crossover(parents_w, p=hyper["p.reproduce"])
+        offspring_w = algo.crossover_2_offspring(parents_w, p=hyper["p.reproduce"])
 
         # MUTATION
         offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
@@ -197,15 +203,15 @@ for _ in range(1):
 
         log.update({"generation": generation, **calc_statistics(population_f)})
 
-        logger.print_log(log.values())
-        logs.append(log.values())  # save the values
+        logger.print_log(log.values())  # print the values
 
-        mean_fitness.append(np.round(np.mean(population_f), 2))
-        max_fitness.append(np.round(np.max(population_f), 2))
-        min_fitness.append(np.round(np.min(population_f), 2))
-        std_fitness.append(np.round(np.std(population_f), 2))
+        for k, v in log.items():
+            logs[k].append(v)
 
-        feedback_fitness(max_fitness, lookback=5, threshold=1, gen=generation)
+        ## Apply tuning Logic
+        if not tuner.hasProgressed("max.fitness", logs["max.fitness"], 2, 10):
+            pass
+            # TODO: Perform action
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
@@ -221,12 +227,14 @@ if settings["saveLogs"]:
     # Write to file
     with open(settings["logfile"], "a+") as f:
 
+        log_length = max(len(values) for values in logs.values())
+
         if printHeaders:
             f.write(",".join([str(x) for x in logger.headers]) + "\n")
 
-        for r in logs:
-            data_log = ",".join([str(x) for x in r]) + "\n"
-            f.write(data_log)
+        for i in range(log_length):
+            line = [str(logs[key][i]) for key in logs.keys()]
+            f.write(",".join(line) + "\n")
 
 # Show Test Run
 if settings["showTestRun"]:
