@@ -182,7 +182,6 @@ class Ga:
 
             for child in offspring:
                 cross_distribution = np.random.uniform(0, 1, n_gnomes)
-                print(cross_distribution)
                 child += cross_distribution * parents[i] + (1 - cross_distribution) * parents[i + 1]
                 total_offspring.append(child)
 

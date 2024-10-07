@@ -13,8 +13,8 @@ from classes.Tuner import Tuner
 # notebook settings
 settings = {
     "videoless": True,  # set to True to increase training
-    "showTestRun": False,  # Show the training afterwards
-    "saveLogs": True,  # Save the logs to a file named logs
+    "showTestRun": True,  # Show the training afterwards
+    "saveLogs": False,  # Save the logs to a file named logs
     "logfile": "./logs.txt",  # where to save the logs
 }
 
@@ -95,40 +95,7 @@ hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_we
 ##### Tuner
 ##############################
 
-tuner = Tuner()
-
-# def update_hyperparameter(paramter:str = "", value:float = 0.1):
-#     hyper.update({paramter: value})
-#     pass
-
-
-# def feedback_fitness(fitness: list = [], lookback: int = 5, threshold: float = 1, gen: int = 0):
-#     global last_update
-
-#     data = fitness[-lookback:]  # take last 'lookback' elements in fitenss array
-
-#     if len(data) < lookback:
-#         return
-
-#     growth = np.max(data) - np.min(data)  # calculate absolute growth (> 0)
-
-#     if (growth < threshold) and (gen - last_update) >= lookback:
-#         last_update = gen
-#         new_val = hyper["sigma.mutate"] + 0.25
-#         hyper.update({"sigma.mutate": new_val})
-#         print(f"\n updated hyperparamter sigma.mutate to {new_val} \n")
-
-
-# metrics = ["max.fitness", "mean.fitness", "min.fitness", "std.fitness"]
-# tracker = {k: [] for k in metrics}
-
-# last_update = 0
-
-# mean_fitness = []
-# max_fitness = []
-# min_fitness = []
-# std_fitness = []
-
+tuner = Tuner(hyperparameters=hyper)
 
 ##############################
 ##### Start Simulation
@@ -165,8 +132,6 @@ for _ in range(1):
 
     for k, v in log.items():
         logs[k].append(v)
-
-    # logs.append(log.values())  # save the values
 
     # Start Evolving
     for generation in range(1, hyper["n.generations"] + 1):
@@ -209,10 +174,20 @@ for _ in range(1):
             logs[k].append(v)
 
         ## Apply tuning Logic
-        if not tuner.hasProgressed("max.fitness", logs["max.fitness"], 2, 10):
-            pass
-            # TODO: Perform action
 
+        lookback = 3
+
+        if len(logs["max.fitness"]) >= lookback:
+
+            if tuner.hasProgressed(name="max.fitness", metrics=logs["max.fitness"], lookback=lookback, threshold=10):
+                new_val = np.max([hyper["sigma.mutate"] - 0.25, 0.1])
+                hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+
+            else:
+                new_val = np.min([hyper["sigma.mutate"] + 0.25, 1.5])
+                hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+
+            # print(tuner.last_update, hyper["sigma.mutate"])
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
 
