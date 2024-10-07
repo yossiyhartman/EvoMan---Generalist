@@ -3,7 +3,7 @@
     "population.size": 60,
     "n.offspring": 2,
     "n.generations": 15,
-    "p.reproduce": 0.474,
+    "p.reproduce": 0.5,
     "p.mutate.individual": 0.5,
     "p.mutate.genome": 0.7,
     "sigma.mutate": 0.5,

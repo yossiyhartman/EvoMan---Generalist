@@ -9,8 +9,18 @@ import numpy as np
 
 
 class Tuner:
-    def __init__(self) -> None:
+    def __init__(self, hyperparameters) -> None:
+        self.hyperparamters = hyperparameters
         self.tracker: Dict = {}
+        self.last_update = 0
+
+    def updateHyperparameter(self, key: str, value: float, generation: int, lookback):
+
+        if generation - self.last_update > lookback:
+            self.hyperparamters.update({key: value})
+            self.last_update = generation
+
+        return self.hyperparamters
 
     def hasProgressed(self, name: str, metrics: list, lookback: int, threshold: float) -> bool:
 
@@ -19,8 +29,7 @@ class Tuner:
 
         vals = metrics[-lookback:]
 
-        if len(vals) < lookback:
-            return
+        print(vals, np.max(vals) - np.min(vals))
 
         return np.max(vals) - np.min(vals) > threshold
 
