@@ -9,9 +9,9 @@ from classes.Logger import Logger
 
 # notebook settings
 settings = {
-    "videoless": False,  # set to True to increase training
-    "showTestRun": False,  # Show the training afterwards
-    "saveLogs": True,  # Save the logs to a file named logs
+    "videoless": True,        # set to True to increase training speed
+    "showTestRun": False,     # Show the training afterwards
+    "saveLogs": True,         # Save the logs to a file named logs
     "logfile": "./logs.txt",  # where to save the logs
 }
 
@@ -22,9 +22,10 @@ settings = {
 
 # Environment Settings
 n_hidden_neurons = 10
-n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
+n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5 # 265
 
-enemies = [1, 2, 3, 4, 5, 6, 7, 8]
+enemies = [2, 4, 5, 7, 8]
+WEIGHTS = [0.249,0.004,0.249,0.249,0.249] # Should equal lenght of 'enemies', and sum to 1
 
 if settings["videoless"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -40,6 +41,8 @@ env = Environment(
     level=2,
     speed="fastest",
     visuals=False,
+    weights=WEIGHTS,
+    use_weights=False,
 )
 
 
@@ -182,9 +185,11 @@ if settings["showTestRun"]:
 
 # Show Test Result
 env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
+env.update_parameter("use_weights", False,)
 f, p, e, t = env.play(run_best_w)
 
 # print outcome of trainign
+print(f"\nAFTER TESTING RUN ON {env.enemies}\n")
 outcome = Logger(["avg.fitness", "avg.playerlife", "avg.enemylife", "avg.time", "avg.gain"])
 outcome.print_headers()
 outcome.print_log([np.round(x, 2) for x in [f, p, e, t, p - e]])

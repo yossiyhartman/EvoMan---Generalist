@@ -17,6 +17,7 @@ from evoman.player import *
 from evoman.controller import Controller
 from evoman.sensors import Sensors
 
+import numpy as np
 
 # main class
 class Environment(object):
@@ -48,6 +49,8 @@ class Environment(object):
         enemy_controller=None,  # controller object
         use_joystick=False,
         visuals=False,
+        weights=[],
+        use_weights=False,
     ):
 
         # initializes parameters
@@ -77,6 +80,10 @@ class Environment(object):
         self.use_joystick = use_joystick
 
         self.visuals = visuals
+
+        self.weights = weights
+        self.use_weights = use_weights
+
         self.enemyImports = {e: __import__("evoman.enemy" + str(e), fromlist=["enemy" + str(e)]) for e in self.enemies}
 
         # initializes default random controllers
@@ -374,6 +381,28 @@ class Environment(object):
     # default fitness function for consolidating solutions among multiple games
     def cons_multi(self, values):
         return values.mean() - values.std()
+    
+    # ALTERNATIVE fitness function for consolidating solutions among multiple games
+    def cons_multi2(self, values):
+        weights = np.array(self.weights)  # Assuming weights are stored in the class as self.weights
+        values = np.array(values)  # Convert values to a numpy array for easier computation
+
+        # Ensure weights and values have the same length
+        if len(weights) != len(values):
+            raise ValueError("Length of weights and values must match.")
+        # Ensure weights sum up to 1
+        if np.sum(weights) != 1:
+            raise ValueError(f"Sum of weight values must equal 1, is {np.sum(weights)}")
+
+        # Calculate the weighted mean
+        weighted_mean = np.average(values, weights=weights)
+
+        # Calculate the weighted standard deviation
+        weighted_variance = np.average((values - weighted_mean) ** 2, weights=weights)
+        weighted_std = np.sqrt(weighted_variance)
+
+        # Return the gain as the difference between weighted mean and weighted standard deviation
+        return weighted_mean - weighted_std
 
     # measures the energy of the player
     def get_playerlife(self):
@@ -563,10 +592,16 @@ class Environment(object):
             venemylife.append(enemylife)
             vtime.append(time)
 
-        vfitness = self.cons_multi(numpy.array(vfitness))
-        vplayerlife = self.cons_multi(numpy.array(vplayerlife))
-        venemylife = self.cons_multi(numpy.array(venemylife))
-        vtime = self.cons_multi(numpy.array(vtime))
+        if self.use_weights:
+            vfitness = self.cons_multi2(numpy.array(vfitness))
+            vplayerlife = self.cons_multi2(numpy.array(vplayerlife))
+            venemylife = self.cons_multi2(numpy.array(venemylife))
+            vtime = self.cons_multi2(numpy.array(vtime))
+        else:
+            vfitness = self.cons_multi(numpy.array(vfitness))
+            vplayerlife = self.cons_multi(numpy.array(vplayerlife))
+            venemylife = self.cons_multi(numpy.array(venemylife))
+            vtime = self.cons_multi(numpy.array(vtime))
 
         return vfitness, vplayerlife, venemylife, vtime
 
