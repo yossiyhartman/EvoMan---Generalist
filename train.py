@@ -180,19 +180,17 @@ for _ in range(1):
         if len(logs["max.fitness"]) >= lookback:
 
             if tuner.hasProgressed(name="max.fitness", metrics=logs["max.fitness"], lookback=lookback, threshold=10):
-                new_val = np.max([hyper["sigma.mutate"] - 0.25, 0.1])
+                new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
                 hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
 
             else:
-                new_val = np.min([hyper["sigma.mutate"] + 0.25, 1.5])
+                new_val = np.min([hyper["sigma.mutate"] + 0.10, 1.5])
                 hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
 
-        if tuner.diversity_low(population_w, 0.1):
-            new_val = hyper["p.reproduce"] + 0.1
-            hyper.update({"p.reproduce": new_val})
-            pass
+            # if tuner.diversity_low(population_w, 0.1):
+            #     new_val = hyper["p.reproduce"] + 0.1
+            #     hyper.update({"p.reproduce": new_val})
 
-            # print(tuner.last_update, hyper["sigma.mutate"])
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
 

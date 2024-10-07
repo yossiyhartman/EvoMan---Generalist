@@ -16,7 +16,7 @@ class Tuner:
 
     def updateHyperparameter(self, key: str, value: float, generation: int, lookback):
 
-        if generation - self.last_update > lookback:
+        if generation - self.last_update >= lookback:
             self.hyperparamters.update({key: value})
             self.last_update = generation
 
@@ -24,19 +24,28 @@ class Tuner:
 
     def hasProgressed(self, name: str, metrics: list, lookback: int, threshold: float) -> bool:
 
-        if not self.tracker.get(name):
-            self.tracker[name] = {"name": name, "last_update": 0}
-
         vals = metrics[-lookback:]
 
         print(vals, np.max(vals) - np.min(vals))
 
         return np.max(vals) - np.min(vals) > threshold
 
-
     def diversity_low(self, weights, threshold: float) -> bool:
         diversity = 0
         for i in range(weights.shape[1]):
             diversity += np.std(weights[:, i])
         return np.std(weights) < threshold
-        
+
+    def noMeanMaxDifference(self, mean_fitness, max_fitness, threshold):
+        """
+        The difference between the max fitness and mean fitness is very close together.
+            PROBLEM: All individuals in the population look like each other
+        """
+        pass
+
+    def noMaxIncrease(self, mean_fitness, max_fitness, threshold):
+        """
+        The difference between the max fitness and mean fitness is very close together.
+            PROBLEM: All individuals in the population look like each other
+        """
+        pass
