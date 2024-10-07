@@ -27,7 +27,7 @@ settings = {
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
-enemies = [6, 7, 8]
+enemies = [6, 7]
 
 if settings["videoless"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -203,6 +203,7 @@ for _ in range(1):
 
         log.update({"generation": generation, **calc_statistics(population_f)})
 
+
         logger.print_log(log.values())  # print the values
 
         for k, v in log.items():
@@ -210,8 +211,19 @@ for _ in range(1):
 
         ## Apply tuning Logic
         if not tuner.hasProgressed("max.fitness", logs["max.fitness"], 2, 10):
+            new_val = hyper["sigma.mutate"] + 0.25
+            hyper.update({"sigma.mutate": new_val})
             pass
             # TODO: Perform action
+        
+        if tuner.diversity_low(population_w, 0.1):
+            new_val = hyper["p.reproduce"] + 0.1
+            hyper.update({"p.reproduce": new_val})
+            pass
+
+
+
+        
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 

@@ -23,3 +23,11 @@ class Tuner:
             return
 
         return np.max(vals) - np.min(vals) > threshold
+
+
+    def diversity_low(self, weights, threshold: float) -> bool:
+        diversity = 0
+        for i in range(weights.shape[1]):
+            diversity += np.std(weights[:, i])
+        return np.std(weights) < threshold
+        
