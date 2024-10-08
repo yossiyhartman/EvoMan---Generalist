@@ -15,7 +15,7 @@ np.random.seed(420)
 
 # notebook settings
 settings = {
-    "showTestRun": True,  # Show the training afterwards
+    "showTestRun": False,  # Show the training afterwards
     "saveLogs": True,  # Save the logs to a file named logs
     "logfile": "./logs.txt",  # where to save the logs
     "saveWeights": True,  # Save the weights to a file named weights
@@ -31,8 +31,8 @@ settings = {
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5 # 265
 
-enemies = [2, 4, 5, 7, 8]
-WEIGHTS = [0.249,0.004,0.249,0.249,0.249] # Should equal lenght of 'enemies', and sum to 1
+enemies = [2, 5, 7, 8]
+WEIGHTS = [0.35,0.30,0.15,0.20] # Should equal lenght of 'enemies', and sum to 1
 
 if not settings["showTestRun"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -49,7 +49,7 @@ env = Environment(
     speed="fastest",
     visuals=False,
     weights=WEIGHTS,
-    use_weights=False,
+    use_weights=True,
 )
 
 
