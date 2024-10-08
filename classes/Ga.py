@@ -26,13 +26,38 @@ class Ga:
         mi, ma = np.min(x), np.max(x)
         return np.asarray([np.divide(k - mi, ma - mi) for k in x])
 
+    @classmethod
+    def bound(self, x, lb: int = 2, ub: int = 2):
+        if x > ub:
+            x = x
+        elif x < lb:
+            x = -2
+        return x
+
     ###################
     # INITIALIZING
     ###################
 
-    def initialize_population(self, population_size: int, n_genomes: int) -> np.array:
-        return np.random.uniform(low=-1, high=1, size=(population_size, n_genomes))
-        # return np.random.normal(size=(population_size, n_genomes))
+    def initialize_population(self, population_size: int, n_genomes: int, normal: bool = False) -> np.array:
+        if normal:
+            return np.random.normal(size=(population_size, n_genomes))
+        else:
+            return np.random.uniform(low=-1, high=1, size=(population_size, n_genomes))
+
+    ###################
+    # REPOPULATION
+    ###################
+
+    def repopulate(self, population: np.array, fitness: np.array, frac: float = 0.75):
+
+        _, n_genomes = population.shape
+        order = np.argsort(fitness)
+
+        discard_amount = int(np.ceil(population.shape[0] * frac))
+
+        new_pop = self.initialize_population(discard_amount, n_genomes)
+
+        return np.vstack((population[order][discard_amount:], new_pop))
 
     ###################
     # SELECTION
@@ -135,13 +160,15 @@ class Ga:
             if np.random.rand() < p_mutation:
                 mutation_dist = np.random.uniform(0, 1, size=offspring.shape[1]) < p_genome
                 individual += mutation_dist * np.random.normal(0, sigma_mutation, size=offspring.shape[1])
+                individual = np.asarray(list(map(lambda x: self.bound(x), individual)))
+
         return offspring
 
     ###################
     # CROSSOVER
     ###################
 
-    def crossover(self, parents: np.array, p: float = 0.5) -> np.array:
+    def crossover_2_offspring(self, parents: np.array, p: float = 0.5) -> np.array:
 
         total_offspring = []
 
@@ -160,9 +187,21 @@ class Ga:
             total_offspring.append(offspring[0])
             total_offspring.append(offspring[1])
 
-            # for child in offspring:
-            #     cross_distribution = np.random.uniform(0, 1)
-            #     child += cross_distribution * parents[i] + (1 - cross_distribution) * parents[i + 1]
-            #     total_offspring.append(child)
+        return np.asarray(total_offspring)
+
+    def crossover_n_offspring(parents: np.array, n_offspring: int = 4) -> np.array:
+
+        total_offspring = []
+
+        for i in range(0, parents.shape[0], 2):
+
+            n_gnomes = len(parents[i])
+
+            offspring = np.zeros(shape=(n_offspring, n_gnomes))
+
+            for child in offspring:
+                cross_distribution = np.random.uniform(0, 1, n_gnomes)
+                child += cross_distribution * parents[i] + (1 - cross_distribution) * parents[i + 1]
+                total_offspring.append(child)
 
         return np.asarray(total_offspring)
