@@ -16,6 +16,8 @@ settings = {
     "showTestRun": True,  # Show the training afterwards
     "saveLogs": False,  # Save the logs to a file named logs
     "logfile": "./logs.txt",  # where to save the logs
+    "saveWeights": False,  # Save the weights to a file named weights
+    "weightsfile": "./weights.txt",  # where to save the weights
 }
 
 
@@ -215,6 +217,11 @@ if settings["saveLogs"]:
         for i in range(log_length):
             line = [str(logger.logs[key][i]) for key in logger.logs.keys()]
             f.write(",".join(line) + "\n")
+
+
+if settings["saveWeights"]:
+    with open(settings["weightsfile"], "w") as f:
+        f.write(",".join([str(x) for x in run_best_w]))
 
 # Show Test Run
 if settings["showTestRun"]:
