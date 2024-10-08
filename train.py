@@ -32,34 +32,26 @@ n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5 # 265
 
 enemies = [2, 5, 7, 8]
-WEIGHTS = [0.35,0.30,0.15,0.20] # Should equal lenght of 'enemies', and sum to 1
+                                    # Should equal lenght of 'enemies', and sum to 1
+
+WEIGHTS = [[0.35,0.30,0.15,0.20],
+           [0.30,0.15,0.20,0.35],
+           [0.15,0.20,0.35,0.30],
+           [0.20,0.35,0.30,0.15],
+           [0.10,0.10,0.40,0.40],
+           [0.10,0.40,0.40,0.10],
+           [0.40,0.10,0.40,0.40],
+           [0.10,0.40,0.10,0.40],
+           [0.50,0.10,0.10,0.20],
+           [0.10,0.50,0.20,0.10],
+           [0.10,0.10,0.10,0.50]]
+
+
 
 if not settings["showTestRun"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 
-env = Environment(
-    experiment_name="./",
-    multiplemode="yes",
-    enemies=enemies,
-    playermode="ai",
-    player_controller=player_controller(n_hidden_neurons),
-    enemymode="static",
-    level=2,
-    speed="fastest",
-    visuals=False,
-    weights=WEIGHTS,
-    use_weights=True,
-)
-
-
-def simulation(x):
-    f, p, e, t = env.play(pcont=x)
-    return f
-
-
-def evaluate(x):
-    return np.array(list(map(lambda y: simulation(y), x)))
 
 
 ##############################
@@ -110,11 +102,33 @@ tuner = Tuner(hyperparameters=hyper)
 algo = Ga()
 
 
-for _ in range(1):
+for i, weight_list in enumerate(WEIGHTS):
 
-    print(2 * "\n" + 7 * "-" + f" run {_} " + 7 * "-", end="\n\n")
+    env = Environment(
+        experiment_name="./",
+        multiplemode="yes",
+        enemies=enemies,
+        playermode="ai",
+        player_controller=player_controller(n_hidden_neurons),
+        enemymode="static",
+        level=2,
+        speed="fastest",
+        visuals=False,
+        weights=weight_list,
+        use_weights=True,
+    )
+    
+    def simulation(x):
+        f, p, e, t = env.play(pcont=x)
+        return f
+
+
+    def evaluate(x):
+        return np.array(list(map(lambda y: simulation(y), x)))
+
+    print(2 * "\n" + 7 * "-" + f" run {i} " + 7 * "-", end="\n\n")
     print(2 * "\n" + 7 * "-" + " Start Evolving " + 7 * "-", end="\n\n")
-    logger.print_headers()
+    # logger.print_headers()
 
     run_best_w, run_best_f = [], -100
 
@@ -127,7 +141,7 @@ for _ in range(1):
 
     log.update(
         {
-            "run id": dt.datetime.today().strftime("%H:%M"),
+            "run id": str(f"{i}_" + dt.datetime.today().strftime("%H:%M")),
             "generation": 0,
             "set of enemies  ": " ".join(str(e) for e in env.enemies),
             **calc_statistics(population_f),
@@ -202,6 +216,19 @@ for _ in range(1):
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
+    
+    # Show Test Result
+    env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
+    env.update_parameter("use_weights", False,)
+    f, p, e, t = env.play(run_best_w)
+
+    # print outcome of trainign
+    print(f"\nAFTER TESTING RUN {i} ON {env.enemies}\n")
+    outcome = Logger(["avg.fitness", "avg.playerlife", "avg.enemylife", "avg.time", "avg.gain"])
+    outcome.print_headers()
+    outcome.print_log([np.round(x, 2) for x in [f, p, e, t, p - e]])
+
+
 
 ##############################
 ##### Post Simulation
@@ -224,22 +251,11 @@ if settings["saveLogs"]:
             f.write(",".join(line) + "\n")
 
 
-if settings["saveWeights"]:
-    with open(settings["weightsfile"], "w") as f:
-        f.write("\n".join([str(x) for x in run_best_w]))
+# if settings["saveWeights"]:
+#     with open(settings["weightsfile"], "w") as f:
+#         f.write("\n".join([str(x) for x in run_best_w]))
 
-# Show Test Run
-if settings["showTestRun"]:
-    env.update_parameter("speed", "normal")
-    env.update_parameter("visuals", "True")
-
-# Show Test Result
-env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
-env.update_parameter("use_weights", False,)
-f, p, e, t = env.play(run_best_w)
-
-# print outcome of trainign
-print(f"\nAFTER TESTING RUN ON {env.enemies}\n")
-outcome = Logger(["avg.fitness", "avg.playerlife", "avg.enemylife", "avg.time", "avg.gain"])
-outcome.print_headers()
-outcome.print_log([np.round(x, 2) for x in [f, p, e, t, p - e]])
+# # Show Test Run
+# if settings["showTestRun"]:
+#     env.update_parameter("speed", "normal")
+#     env.update_parameter("visuals", "True")

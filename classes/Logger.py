@@ -14,7 +14,7 @@ class Logger:
 
     def save_log(self, log):
         # print the logs
-        self.print_log(log.values())
+        # self.print_log(log.values())
 
         for k, v in log.items():
             self.logs[k].append(v)
