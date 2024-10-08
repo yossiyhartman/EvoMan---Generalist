@@ -4,15 +4,22 @@ import datetime as dt
 import numpy as np
 from evoman.environment import Environment
 from demo_controller import player_controller
+
+# Our classes
 from classes.Ga import Ga
 from classes.Logger import Logger
+from classes.Tuner import Tuner
+
+# seed
+np.random.seed(420)
 
 # notebook settings
 settings = {
-    "videoless": True,        # set to True to increase training speed
-    "showTestRun": False,     # Show the training afterwards
-    "saveLogs": True,         # Save the logs to a file named logs
+    "showTestRun": True,  # Show the training afterwards
+    "saveLogs": True,  # Save the logs to a file named logs
     "logfile": "./logs.txt",  # where to save the logs
+    "saveWeights": True,  # Save the weights to a file named weights
+    "weightsfile": "./weights.txt",  # where to save the weights
 }
 
 
@@ -27,7 +34,7 @@ n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5 # 2
 enemies = [2, 4, 5, 7, 8]
 WEIGHTS = [0.249,0.004,0.249,0.249,0.249] # Should equal lenght of 'enemies', and sum to 1
 
-if settings["videoless"]:
+if not settings["showTestRun"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 
@@ -71,7 +78,6 @@ def calc_statistics(fitness: np.array):
 
 headers = ["run id", "generation", "max.fitness", "mean.fitness", "min.fitness", "std.fitness", "set of enemies  "]
 logger = Logger(headers=headers)
-logs = []
 
 ##############################
 ##### Initialize Hyper parameters
@@ -90,8 +96,15 @@ def load_hyperparameters(file: str, n_genomes=None):
 
 hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_weights)
 
+
 ##############################
-##### Initialize Simulation
+##### Tuner
+##############################
+
+tuner = Tuner(hyperparameters=hyper)
+
+##############################
+##### Start Simulation
 ##############################
 
 algo = Ga()
@@ -121,8 +134,7 @@ for _ in range(1):
         },
     )
 
-    logger.print_log(log.values())  # print values
-    logs.append(log.values())  # save the values
+    logger.save_log(log)  # print values
 
     # Start Evolving
     for generation in range(1, hyper["n.generations"] + 1):
@@ -131,7 +143,7 @@ for _ in range(1):
         parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
 
         # CROSSOVER
-        offspring_w = algo.crossover(parents_w, p=hyper["p.reproduce"])
+        offspring_w = algo.crossover_2_offspring(parents_w, p=hyper["p.reproduce"])
 
         # MUTATION
         offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
@@ -159,10 +171,41 @@ for _ in range(1):
 
         log.update({"generation": generation, **calc_statistics(population_f)})
 
-        logger.print_log(log.values())
-        logs.append(log.values())  # save the values
+        logger.save_log(log)
+
+        # Apply tuning Logic
+
+        # diversity = 0
+        # for i in range(population_w.shape[1]):
+        #     diversity += np.std(population_w[:, i])
+        # print("DIVERSITY:", diversity)
+
+        # lookback = 3
+
+        # if len(logger.logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
+
+        #     if tuner.hasProgressed(name="max.fitness", metrics=logger.logs["max.fitness"], lookback=lookback, threshold=10):
+        #         new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
+        #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+
+        #     else:
+        #         new_val = np.min([hyper["sigma.mutate"] + 0.10, 1.5])
+        #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+
+        #     if tuner.diversity_low(population_w, 160):
+        #         new_val = hyper["p.reproduce"] + 0.1
+        #         hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
+
+        #     else:
+        #         new_val = hyper["p.reproduce"] - 0.1
+        #         hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
+
+
+##############################
+##### Post Simulation
+##############################
 
 
 if settings["saveLogs"]:
@@ -171,12 +214,19 @@ if settings["saveLogs"]:
     # Write to file
     with open(settings["logfile"], "a+") as f:
 
+        log_length = max(len(values) for values in logger.logs.values())
+
         if printHeaders:
             f.write(",".join([str(x) for x in logger.headers]) + "\n")
 
-        for r in logs:
-            data_log = ",".join([str(x) for x in r]) + "\n"
-            f.write(data_log)
+        for i in range(log_length):
+            line = [str(logger.logs[key][i]) for key in logger.logs.keys()]
+            f.write(",".join(line) + "\n")
+
+
+if settings["saveWeights"]:
+    with open(settings["weightsfile"], "w") as f:
+        f.write("\n".join([str(x) for x in run_best_w]))
 
 # Show Test Run
 if settings["showTestRun"]:
