@@ -10,13 +10,15 @@ from classes.Ga import Ga
 from classes.Logger import Logger
 from classes.Tuner import Tuner
 
+# seed
+np.random.seed(420)
+
 # notebook settings
 settings = {
-    "videoless": True,  # set to True to increase training
     "showTestRun": True,  # Show the training afterwards
-    "saveLogs": False,  # Save the logs to a file named logs
+    "saveLogs": True,  # Save the logs to a file named logs
     "logfile": "./logs.txt",  # where to save the logs
-    "saveWeights": False,  # Save the weights to a file named weights
+    "saveWeights": True,  # Save the weights to a file named weights
     "weightsfile": "./weights.txt",  # where to save the weights
 }
 
@@ -29,9 +31,9 @@ settings = {
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
-enemies = [6, 7, 8]
+enemies = [5, 7, 8]
 
-if settings["videoless"]:
+if not settings["showTestRun"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 
@@ -168,32 +170,32 @@ for _ in range(1):
 
         logger.save_log(log)
 
-        ## Apply tuning Logic
+        # Apply tuning Logic
 
-        diversity = 0
-        for i in range(population_w.shape[1]):
-            diversity += np.std(population_w[:, i])
-        print("DIVERSITY:", diversity)
+        # diversity = 0
+        # for i in range(population_w.shape[1]):
+        #     diversity += np.std(population_w[:, i])
+        # print("DIVERSITY:", diversity)
 
-        lookback = 3
+        # lookback = 3
 
-        if len(logger.logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
+        # if len(logger.logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
 
-            #     if tuner.hasProgressed(name="max.fitness", metrics=logs["max.fitness"], lookback=lookback, threshold=10):
-            #         new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
-            #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+        #     if tuner.hasProgressed(name="max.fitness", metrics=logger.logs["max.fitness"], lookback=lookback, threshold=10):
+        #         new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
+        #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
 
-            #     else:
-            #         new_val = np.min([hyper["sigma.mutate"] + 0.10, 1.5])
-            #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+        #     else:
+        #         new_val = np.min([hyper["sigma.mutate"] + 0.10, 1.5])
+        #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
 
-            if tuner.diversity_low(population_w, 160):
-                new_val = hyper["p.reproduce"] + 0.1
-                hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
+        #     if tuner.diversity_low(population_w, 160):
+        #         new_val = hyper["p.reproduce"] + 0.1
+        #         hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
 
-            else:
-                new_val = hyper["p.reproduce"] - 0.1
-                hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
+        #     else:
+        #         new_val = hyper["p.reproduce"] - 0.1
+        #         hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
@@ -221,7 +223,7 @@ if settings["saveLogs"]:
 
 if settings["saveWeights"]:
     with open(settings["weightsfile"], "w") as f:
-        f.write(",".join([str(x) for x in run_best_w]))
+        f.write("\n".join([str(x) for x in run_best_w]))
 
 # Show Test Run
 if settings["showTestRun"]:
