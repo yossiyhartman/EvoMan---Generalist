@@ -29,7 +29,10 @@ settings = {
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
-enemies = [6, 7, 8]
+# Set random seed for reproducibility
+seed = 42
+np.random.seed(seed)
+enemies = [6, 7]
 
 if settings["videoless"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -166,34 +169,36 @@ for _ in range(1):
 
         log.update({"generation": generation, **calc_statistics(population_f)})
 
+
+
         logger.save_log(log)
 
         ## Apply tuning Logic
-
-        diversity = 0
-        for i in range(population_w.shape[1]):
-            diversity += np.std(population_w[:, i])
-        print("DIVERSITY:", diversity)
+        
 
         lookback = 3
 
         if len(logger.logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
 
-            #     if tuner.hasProgressed(name="max.fitness", metrics=logs["max.fitness"], lookback=lookback, threshold=10):
-            #         new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
-            #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+            if tuner.hasStagnated(metrics=logger.logs["max.fitness"], lookback=lookback, threshold=1):
+                new_val = np.min([hyper["population.size"] + 20],200)
+                hyper = tuner.updateHyperparameter(key="population.size", value=new_val, generation=generation, lookback=lookback)
 
-            #     else:
-            #         new_val = np.min([hyper["sigma.mutate"] + 0.10, 1.5])
-            #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+            # elif tuner.hasProgressed(metrics=logger.logs["max.fitness"], lookback=lookback, threshold=10):
+            #     new_val = np.max([hyper["population.size"] + 0.10, 1.5])
+            #     hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
 
-            if tuner.diversity_low(population_w, 160):
-                new_val = hyper["p.reproduce"] + 0.1
-                hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
+            if tuner.diversity_low(population_w, 140):
+                new_val = np.min([hyper["sigma.mutate"] + 0.05, 0.1])
+                hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
 
             else:
-                new_val = hyper["p.reproduce"] - 0.1
+                new_val = np.max([hyper["sigma.mutate"] - 0.05, 0.1])
                 hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
+
+            # if tuner.noMeanMaxDifference(log.mean_fitness, log.max_fitness, 5):
+            #     new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
+            #     hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
