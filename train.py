@@ -34,17 +34,18 @@ n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5 # 2
 enemies = [2, 5, 7, 8]
                                     # Should equal lenght of 'enemies', and sum to 1
 
-WEIGHTS = [[0.35,0.30,0.15,0.20],
+WEIGHTS = [[0.25,0.25,0.25,0.25],
+           [0.35,0.30,0.15,0.20],
            [0.30,0.15,0.20,0.35],
            [0.15,0.20,0.35,0.30],
            [0.20,0.35,0.30,0.15],
            [0.10,0.10,0.40,0.40],
            [0.10,0.40,0.40,0.10],
-           [0.40,0.10,0.40,0.40],
+           [0.40,0.10,0.10,0.40],
            [0.10,0.40,0.10,0.40],
-           [0.50,0.10,0.10,0.20],
-           [0.10,0.50,0.20,0.10],
-           [0.10,0.10,0.10,0.50]]
+           [0.60,0.10,0.10,0.20],
+           [0.10,0.60,0.20,0.10],
+           [0.10,0.20,0.10,0.60]]
 
 
 
@@ -101,7 +102,7 @@ tuner = Tuner(hyperparameters=hyper)
 
 algo = Ga()
 
-
+weights_gain_results = []
 for i, weight_list in enumerate(WEIGHTS):
 
     env = Environment(
@@ -228,7 +229,10 @@ for i, weight_list in enumerate(WEIGHTS):
     outcome.print_headers()
     outcome.print_log([np.round(x, 2) for x in [f, p, e, t, p - e]])
 
+    weights_gain_results.append((i, p-e))
 
+
+print(weights_gain_results)
 
 ##############################
 ##### Post Simulation

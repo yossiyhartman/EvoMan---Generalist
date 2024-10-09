@@ -391,8 +391,8 @@ class Environment(object):
         if len(weights) != len(values):
             raise ValueError("Length of weights and values must match.")
         # Ensure weights sum up to 1
-        if np.sum(weights) != 1:
-            raise ValueError(f"Sum of weight values must equal 1, is {np.sum(weights)}")
+        if not np.isclose(np.sum(weights), 1.0):
+            raise ValueError(f"Sum of weight values must equal 1, but is {np.sum(weights)}")
 
         # Calculate the weighted mean
         weighted_mean = np.average(values, weights=weights)
