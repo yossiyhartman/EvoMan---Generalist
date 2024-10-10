@@ -33,14 +33,14 @@ class Tuner:
         The max hasn't inreased in 'n' generations
             PROBLEM: stuck in a local optimum
         """
-        return np.subtract(max_fitness[-1], max_fitness[-lookback]) < threshold
+        return np.subtract(max_fitness[-1], max_fitness[-lookback]) <= threshold
 
     def noMeanMaxDifference(self, mean_fitness, max_fitness, threshold: float = 10.0, lookback: int = 0):
         """
         The difference between the max fitness and mean fitness is very close together.
             PROBLEM: All individuals in the population look like each other
         """
-        return all(np.subtract(max_fitness[-lookback:], mean_fitness[-lookback:]) < threshold)
+        return all(np.subtract(max_fitness[-lookback:], mean_fitness[-lookback:]) <= threshold)
 
     def similairWeights(self, population):
         """
@@ -52,6 +52,7 @@ class Tuner:
 
         for i in range(population.shape[0]):
             for j in range(i + 1, population.shape[0]):
-                distances.append(np.linalg.norm(population[i] - population[j]))
+                d = np.linalg.norm(np.subtract(population[i], population[j])) / 65
+                distances.append(d)
 
-        return distances
+        return np.mean(distances)
