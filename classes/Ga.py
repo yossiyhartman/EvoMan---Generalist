@@ -42,7 +42,7 @@ class Ga:
         if normal:
             return np.random.normal(size=(population_size, n_genomes))
         else:
-            return np.random.uniform(low=-1, high=1, size=(population_size, n_genomes))
+            return np.random.uniform(low=-2, high=2, size=(population_size, n_genomes))
 
     ###################
     # REPOPULATION
