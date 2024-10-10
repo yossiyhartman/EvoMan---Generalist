@@ -20,39 +20,89 @@ settings = {
     "logfile": "./logs.txt",  # where to save the logs
     "saveWeights": True,  # Save the weights to a file named weights
     "weightsfile": "./weights.txt",  # where to save the weights
+    "saveWeightLogs": True, # Save weight changing gain results
+    "weightLogfile": "./weightLogs.txt",  # where to save the weightlogs
 }
 
+if not settings["showTestRun"]:
+    os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 ##############################
 ##### Initialize Environment
 ##############################
 
+
 # Environment Settings
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5 # 265
 
-enemies = [2, 5, 7, 8]
+enemies = [1,2,3,4,5,6,7,8]
                                     # Should equal lenght of 'enemies', and sum to 1
 
-WEIGHTS = [[0.25,0.25,0.25,0.25],
-           [0.35,0.30,0.15,0.20],
-           [0.30,0.15,0.20,0.35],
-           [0.15,0.20,0.35,0.30],
-           [0.20,0.35,0.30,0.15],
-           [0.10,0.10,0.40,0.40],
-           [0.10,0.40,0.40,0.10],
-           [0.40,0.10,0.10,0.40],
-           [0.10,0.40,0.10,0.40],
-           [0.60,0.10,0.10,0.20],
-           [0.10,0.60,0.20,0.10],
-           [0.10,0.20,0.10,0.60]]
+########################
+## Initialize Weights ##
+########################
 
+WEIGHTS = [[0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125],
+           [0.500, 0.071428, 0.071428, 0.071428, 0.071428, 0.071428, 0.071428, 0.071428],
+           [0.1, 0.1, 0.1, 0.1, 0.1, 0.20, 0.15, 0.15],
+           [0.3, 0.1, 0.1, 0.1, 0.05, 0.05, 0.15, 0.15],
+           [0.05, 0.05, 0.05, 0.05, 0.2, 0.2, 0.2, 0.2],
+           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
+           [0.15, 0.2, 0.05, 0.1, 0.1, 0.15, 0.15, 0.1],
+           [0.05, 0.1, 0.2, 0.25, 0.1, 0.15, 0.1, 0.05],
+           [0, 0.05, 0.2, 0.25, 0.25, 0.1, 0.05, 0.1],
+           [0.125, 0.175, 0.1, 0.075, 0.2, 0, .2, 0.125]]
 
+def check_weights(enemies, weights):
+    for i, weight_list in enumerate(weights):
+        # Ensure weights and enemies have the same length
+        if len(weight_list) != len(enemies):
+            raise ValueError("Length of weights and values must match.")
+        # Ensure weights sum up to 1
+        if not np.isclose(np.sum(weight_list), 1.0, atol=1e-3):
+            raise ValueError(f"Sum of weight values must equal 1, but for list {i} is {np.sum(weight_list)}")
 
-if not settings["showTestRun"]:
-    os.environ["SDL_VIDEODRIVER"] = "dummy"
+check_weights(enemies, WEIGHTS)
 
+#           [[0.25,0.25,0.25,0.25],
+#            [0.35,0.30,0.15,0.20],
+#            [0.30,0.15,0.20,0.35],
+#            [0.15,0.20,0.35,0.30],
+#            [0.20,0.35,0.30,0.15],
+#            [0.10,0.10,0.40,0.40],
+#            [0.10,0.40,0.40,0.10],
+#            [0.40,0.10,0.10,0.40],
+#            [0.10,0.40,0.10,0.40],
+#            [0.60,0.10,0.10,0.20],
+#            [0.10,0.60,0.20,0.10],
+#            [0.10,0.20,0.10,0.60]]
 
+# Funtion that updates weights based on enemy gain stats
+def update_weights(per_enemy_stats, weights, increase_factor=0.1):
+    # Calculate gains (player_life - enemy_life) for each enemy
+    gains = np.array([stats.player_life - stats.enemy_life for stats in per_enemy_stats])
+
+    # Find index of the enemy with the lowest gain
+    lowest_gain_idx = np.argmin(gains)
+
+    # Update the weight of the lowest gain enemy
+    new_weights = np.array(weights)
+    new_weights[lowest_gain_idx] += increase_factor
+
+    # Adjust the remaining weights so that the total sum is 1
+    excess = new_weights[lowest_gain_idx] - weights[lowest_gain_idx]
+    remaining_sum = 1 - new_weights[lowest_gain_idx]
+
+    # Distribute the remaining weights proportionally among the other enemies
+    for i in range(len(weights)):
+        if i != lowest_gain_idx:
+            new_weights[i] *= remaining_sum / (1 - weights[lowest_gain_idx])
+
+    # Normalize weights to ensure the sum is exactly 1 (in case of floating-point precision issues)
+    new_weights /= new_weights.sum()
+
+    return new_weights
 
 
 ##############################
@@ -72,6 +122,9 @@ def calc_statistics(fitness: np.array):
 headers = ["run id", "generation", "max.fitness", "mean.fitness", "min.fitness", "std.fitness", "set of enemies  "]
 logger = Logger(headers=headers)
 
+weights_headers = ["run_id", "enemy_weights", "enemy_gains", "avg_gain"]
+weights_logger = Logger(headers=weights_headers)
+
 ##############################
 ##### Initialize Hyper parameters
 ##############################
@@ -90,6 +143,7 @@ def load_hyperparameters(file: str, n_genomes=None):
 hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_weights)
 
 
+
 ##############################
 ##### Tuner
 ##############################
@@ -102,9 +156,17 @@ tuner = Tuner(hyperparameters=hyper)
 
 algo = Ga()
 
-weights_gain_results = []
-for i, weight_list in enumerate(WEIGHTS):
+nr_weight_tests = 0
+MAX_NR_WEIGHT_TESTS = 4
 
+STARTING_WEIGHTS = [[0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25]] # More weight on 7,8
+check_weights(enemies, STARTING_WEIGHTS)
+enemy_weights_results = []
+
+# Start loop for finding good enemy_weights
+enemy_weights = STARTING_WEIGHTS[0]
+
+while (nr_weight_tests <= MAX_NR_WEIGHT_TESTS): # Stop after search limit reached OR ...            #for i, weight_list in enumerate(WEIGHTS):
     env = Environment(
         experiment_name="./",
         multiplemode="yes",
@@ -115,19 +177,20 @@ for i, weight_list in enumerate(WEIGHTS):
         level=2,
         speed="fastest",
         visuals=False,
-        weights=weight_list,
+        weights=enemy_weights,
         use_weights=True,
     )
     
     def simulation(x):
-        f, p, e, t = env.play(pcont=x)
-        return f
+        per_enemy_stats, average_stats = env.play(pcont=x)
+        #f, p, e, t = env.play(pcont=x)
+        return average_stats.avg_fitness
 
 
     def evaluate(x):
         return np.array(list(map(lambda y: simulation(y), x)))
 
-    print(2 * "\n" + 7 * "-" + f" run {i} " + 7 * "-", end="\n\n")
+    print(2 * "\n" + 7 * "-" + f" run {nr_weight_tests} " + 7 * "-", end="\n\n")
     print(2 * "\n" + 7 * "-" + " Start Evolving " + 7 * "-", end="\n\n")
     # logger.print_headers()
 
@@ -142,7 +205,7 @@ for i, weight_list in enumerate(WEIGHTS):
 
     log.update(
         {
-            "run id": str(f"{i}_" + dt.datetime.today().strftime("%H:%M")),
+            "run id": str(f"{nr_weight_tests}_" + dt.datetime.today().strftime("%H:%M")),
             "generation": 0,
             "set of enemies  ": " ".join(str(e) for e in env.enemies),
             **calc_statistics(population_f),
@@ -221,18 +284,45 @@ for i, weight_list in enumerate(WEIGHTS):
     # Show Test Result
     env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
     env.update_parameter("use_weights", False,)
-    f, p, e, t = env.play(run_best_w)
+    
+    # Get gain results per enemy and overall
+    per_enemy_stats, average_stats = env.play(run_best_w)
 
-    # print outcome of trainign
-    print(f"\nAFTER TESTING RUN {i} ON {env.enemies}\n")
+    f = average_stats.avg_fitness
+    p = average_stats.avg_player_life
+    e = average_stats.avg_enemy_life
+    t = average_stats.avg_time
+
+    # Store weight results
+    enemy_gains = list([stats.player_life - stats.enemy_life for stats in per_enemy_stats])
+    avg_gain = p-e
+    enemy_weights_results.append((enemy_weights, enemy_gains, avg_gain))
+
+    weights_log = {h: 0 for h in weights_headers}
+    weights_log.update(
+        {"run id": str(f"{nr_weight_tests-1}_" + dt.datetime.today().strftime("%H:%M")),
+            "enemy_weights": enemy_weights,
+            "enemy_gains": enemy_gains,
+            "avg_gain" : avg_gain},
+    )
+
+    weights_logger.save_log(weights_log)
+
+    # Update weights based on enemy effectiveness
+    new_weights = update_weights(per_enemy_stats, enemy_weights, increase_factor=0.05)
+    enemy_weights = new_weights
+    nr_weight_tests += 1
+
+    # print outcome of training
+    print(f"\nAFTER TESTING RUN ON {env.enemies}\n")
     outcome = Logger(["avg.fitness", "avg.playerlife", "avg.enemylife", "avg.time", "avg.gain"])
     outcome.print_headers()
     outcome.print_log([np.round(x, 2) for x in [f, p, e, t, p - e]])
 
-    weights_gain_results.append((i, p-e))
+    logger.save_log(log) 
 
 
-print(weights_gain_results)
+print(enemy_weights_results)
 
 ##############################
 ##### Post Simulation
@@ -252,6 +342,21 @@ if settings["saveLogs"]:
 
         for i in range(log_length):
             line = [str(logger.logs[key][i]) for key in logger.logs.keys()]
+            f.write(",".join(line) + "\n")
+
+if settings["saveWeightLogs"]:
+    printHeaders = True if not os.path.exists(settings["weightLogfile"]) else False
+
+    # Write to file
+    with open(settings["weightLogfile"], "a+") as f:
+
+        log_length = max(len(values) for values in weights_logger.logs.values())
+
+        if printHeaders:
+            f.write(",".join([str(x) for x in weights_logger.headers]) + "\n")
+
+        for i in range(log_length):
+            line = [str(weights_logger.logs[key][i]) for key in weights_logger.logs.keys()]
             f.write(",".join(line) + "\n")
 
 

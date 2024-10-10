@@ -12,12 +12,27 @@ import pygame
 from pygame.locals import *
 import struct
 import evoman.tmx as tmx
+from dataclasses import dataclass
+import numpy as np
 
 from evoman.player import *
 from evoman.controller import Controller
 from evoman.sensors import Sensors
 
-import numpy as np
+# Data classes
+@dataclass
+class GameStats:
+    fitness: float
+    player_life: float
+    enemy_life: float
+    time: float
+
+@dataclass
+class AverageGameStats:
+    avg_fitness: float
+    avg_player_life: float
+    avg_enemy_life: float
+    avg_time: float
 
 # main class
 class Environment(object):
@@ -391,7 +406,7 @@ class Environment(object):
         if len(weights) != len(values):
             raise ValueError("Length of weights and values must match.")
         # Ensure weights sum up to 1
-        if not np.isclose(np.sum(weights), 1.0):
+        if not np.isclose(np.sum(weights), 1.0, atol=1e-3):
             raise ValueError(f"Sum of weight values must equal 1, but is {np.sum(weights)}")
 
         # Calculate the weighted mean
@@ -582,28 +597,41 @@ class Environment(object):
 
     # repeats run for every enemy in list
     def multiple(self, pcont, econt):
-
+        per_enemy_stats = []
         vfitness, vplayerlife, venemylife, vtime = [], [], [], []
-        for e in self.enemies:
 
+        for e in self.enemies:
             fitness, playerlife, enemylife, time = self.run_single(e, pcont, econt)
+
+            # Store Results
+            per_enemy_stats.append(GameStats(fitness, playerlife, enemylife, time))
+
             vfitness.append(fitness)
             vplayerlife.append(playerlife)
             venemylife.append(enemylife)
             vtime.append(time)
 
         if self.use_weights:
-            vfitness = self.cons_multi2(numpy.array(vfitness))
-            vplayerlife = self.cons_multi2(numpy.array(vplayerlife))
-            venemylife = self.cons_multi2(numpy.array(venemylife))
-            vtime = self.cons_multi2(numpy.array(vtime))
+            avg_fitness = self.cons_multi2(numpy.array(vfitness))
+            avg_player_life = self.cons_multi2(numpy.array(vplayerlife))
+            avg_enemy_life = self.cons_multi2(numpy.array(venemylife))
+            avg_time = self.cons_multi2(numpy.array(vtime))
         else:
-            vfitness = self.cons_multi(numpy.array(vfitness))
-            vplayerlife = self.cons_multi(numpy.array(vplayerlife))
-            venemylife = self.cons_multi(numpy.array(venemylife))
-            vtime = self.cons_multi(numpy.array(vtime))
+            avg_fitness = self.cons_multi(numpy.array(vfitness))
+            avg_player_life = self.cons_multi(numpy.array(vplayerlife))
+            avg_enemy_life = self.cons_multi(numpy.array(venemylife))
+            avg_time = self.cons_multi(numpy.array(vtime))
 
-        return vfitness, vplayerlife, venemylife, vtime
+        # Create AverageGameStats
+        average_stats = AverageGameStats(
+            avg_fitness=avg_fitness,
+            avg_player_life=avg_player_life,
+            avg_enemy_life=avg_enemy_life,
+            avg_time=avg_time
+        )
+
+        return per_enemy_stats, average_stats
+        # return vfitness, vplayerlife, venemylife, vtime
 
     # checks objective mode
     def play(self, pcont="None", econt="None"):
