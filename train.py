@@ -10,13 +10,15 @@ from classes.Ga import Ga
 from classes.Logger import Logger
 from classes.Tuner import Tuner
 
+# seed
+np.random.seed(420)
+
 # notebook settings
 settings = {
-    "videoless": True,  # set to True to increase training
     "showTestRun": True,  # Show the training afterwards
-    "saveLogs": False,  # Save the logs to a file named logs
+    "saveLogs": True,  # Save the logs to a file named logs
     "logfile": "./logs.txt",  # where to save the logs
-    "saveWeights": False,  # Save the weights to a file named weights
+    "saveWeights": True,  # Save the weights to a file named weights
     "weightsfile": "./weights.txt",  # where to save the weights
 }
 
@@ -34,7 +36,7 @@ seed = 42
 np.random.seed(seed)
 enemies = [6, 7]
 
-if settings["videoless"]:
+if not settings["showTestRun"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 
@@ -176,9 +178,9 @@ for _ in range(1):
         ## Apply tuning Logic
         
 
-        lookback = 3
+        # lookback = 3
 
-        if len(logger.logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
+        # if len(logger.logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
 
             if tuner.hasStagnated(metrics=logger.logs["max.fitness"], lookback=lookback, threshold=1):
                 new_val = np.min([hyper["population.size"] + 20],200)
@@ -226,7 +228,7 @@ if settings["saveLogs"]:
 
 if settings["saveWeights"]:
     with open(settings["weightsfile"], "w") as f:
-        f.write(",".join([str(x) for x in run_best_w]))
+        f.write("\n".join([str(x) for x in run_best_w]))
 
 # Show Test Run
 if settings["showTestRun"]:
