@@ -189,7 +189,7 @@ class Ga:
 
         return np.asarray(total_offspring)
 
-    def crossover_n_offspring(parents: np.array, n_offspring: int = 4) -> np.array:
+    def crossover_n_offspring(self, parents: np.array, n_offspring: int = 4) -> np.array:
 
         total_offspring = []
 
