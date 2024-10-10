@@ -301,9 +301,9 @@ while (nr_weight_tests <= MAX_NR_WEIGHT_TESTS): # Stop after search limit reache
     weights_log = {h: 0 for h in weights_headers}
     weights_log.update(
         {"run id": str(f"{nr_weight_tests-1}_" + dt.datetime.today().strftime("%H:%M")),
-            "enemy_weights": enemy_weights,
-            "enemy_gains": enemy_gains,
-            "avg_gain" : avg_gain},
+        "enemy_weights": enemy_weights,
+        "enemy_gains": enemy_gains,
+        "avg_gain" : avg_gain},
     )
 
     weights_logger.save_log(weights_log)
