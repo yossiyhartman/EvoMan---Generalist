@@ -16,9 +16,10 @@ np.random.seed(420)
 # notebook settings
 settings = {
     "showTestRun": True,  # Show the training afterwards
-    "saveLogs": True,  # Save the logs to a file named logs
+    "saveLogs": False,  # Save the logs to a file named logs
+    "printLogs": True,
     "logfile": "./logs.txt",  # where to save the logs
-    "saveWeights": True,  # Save the weights to a file named weights
+    "saveWeights": False,  # Save the weights to a file named weights
     "weightsfile": "./weights.txt",  # where to save the weights
 }
 
@@ -31,7 +32,8 @@ settings = {
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
-enemies = [5, 7, 8]
+enemies = [1, 5, 6, 8]
+
 
 if not settings["showTestRun"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -50,9 +52,9 @@ env = Environment(
 )
 
 
-def simulation(x):
+def simulation(x, gain=False):
     f, p, e, t = env.play(pcont=x)
-    return f
+    return p - e
 
 
 def evaluate(x):
@@ -73,8 +75,8 @@ def calc_statistics(fitness: np.array):
     }
 
 
-headers = ["run id", "generation", "max.fitness", "mean.fitness", "min.fitness", "std.fitness", "set of enemies  "]
-logger = Logger(headers=headers)
+headers = ["set of enemies  ", "run id", "gen", "max.fitness", "mean.fitness", "min.fitness", "std.fitness", "genotype.dist", "p.indivi", "p.genome", "simga", "tour.size"]
+logger = Logger(headers=headers, print=settings["printLogs"])
 
 ##############################
 ##### Initialize Hyper parameters
@@ -83,7 +85,7 @@ logger = Logger(headers=headers)
 
 def load_hyperparameters(file: str, n_genomes=None):
     with open(file, "r") as f:
-        data = json.load(f)
+        data: dict = json.load(f)
 
         if n_genomes:
             data.update({"n_genomes": n_genomes})
@@ -91,8 +93,12 @@ def load_hyperparameters(file: str, n_genomes=None):
         return data
 
 
-hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_weights)
+hyper_defaults = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_weights)
+hyper = hyper_defaults.copy()
 
+h = Logger(headers=hyper.keys(), print=settings["printLogs"])
+h.print_headers()
+h.print_log(hyper.values())
 
 ##############################
 ##### Tuner
@@ -100,12 +106,12 @@ hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_we
 
 tuner = Tuner(hyperparameters=hyper)
 
-lookback = 12
+free_period = 10  # period before tuning starts
+explore_time = 10  # how many evolutions does the algo get to test new parameters settings
+lookback = 5  # comparison window
 
-update_timestamp = {
-    "increase.mutation": 0,
-    "repopulate": 0,
-}
+update_timestamp = {k: 0 for k in hyper.keys()}
+pivot_to_exploration_ts = 0
 
 ##############################
 ##### Start Simulation
@@ -131,9 +137,14 @@ for _ in range(1):
     log.update(
         {
             "run id": dt.datetime.today().strftime("%M:%S"),
-            "generation": 0,
+            "gen": 0,
             "set of enemies  ": " ".join(str(e) for e in env.enemies),
             **calc_statistics(population_f),
+            "genotype.dist": np.round(tuner.similairWeights(population_w), 3),
+            "p.indivi": hyper["p.mutate.individual"],
+            "p.genome": hyper["p.mutate.genome"],
+            "simga": hyper["sigma.mutate"],
+            "tour.size": hyper["tournament.size"],
         },
     )
 
@@ -146,7 +157,7 @@ for _ in range(1):
         parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
 
         # CROSSOVER
-        offspring_w = algo.crossover_n_offspring(parents_w, hyper['n.offspring'])
+        offspring_w = algo.crossover_n_offspring(parents_w, hyper["n.offspring"])
 
         # MUTATION
         offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
@@ -172,29 +183,61 @@ for _ in range(1):
         run_best_w = population_w[best_idx]
         run_best_f = population_f[best_idx]
 
-        log.update({"generation": generation, **calc_statistics(population_f)})
+        log.update(
+            {
+                "gen": generation,
+                **calc_statistics(population_f),
+                "genotype.dist": np.round(tuner.similairWeights(population_w), 3),
+                "p.indivi": hyper["p.mutate.individual"],
+                "p.genome": hyper["p.mutate.genome"],
+                "simga": hyper["sigma.mutate"],
+                "tour.size": hyper["tournament.size"],
+            }
+        )
 
         logger.save_log(log)
 
-        if generation >= lookback:
-            # conditions
-            can_update_sigma = generation - update_timestamp["increase.mutation"] > lookback
+        # Tuning
 
-            if tuner.noMaxIncrease(logger.logs["max.fitness"], 10, lookback) & can_update_sigma:
-                update_timestamp['increase.mutation'] = generation
-                new_sigma = np.min([hyper["sigma.mutate"] + 0.25, 1])
-                hyper.update({"sigma.mutate": new_sigma})
-                print(f'update sigma to {hyper['sigma.mutate']}')
+        if generation >= free_period:
 
-                # TODO: add maybe more changes
+            ### per metric
 
-            can_update_repopulate = generation - update_timestamp["repopulate"] > lookback
+            # per metric
+            # can_update = {k: (generation - update_timestamp[k] >= explore_time) for k in update_timestamp.keys()}
 
-            if tuner.noMeanMaxDifference(logger.logs["mean.fitness"], logger.logs["max.fitness"], 15, lookback) & can_update_repopulate:
-                update_timestamp['repopulate'] = generation
-                parents_w = algo.repopulate(parents_w, parents_f, frac=0.6)
-                parents_f = evaluate(parents_w)
-                print('repopulated!')
+            # # check when the latest update is done
+            # if can_update["sigma.mutate"]:
+
+            #     if tuner.noMaxIncrease(logger.logs["max.fitness"], 0, lookback):
+            #         new_sigma = np.min([hyper["sigma.mutate"] + 0.10, 0.6])
+            #         hyper.update({"sigma.mutate": new_sigma})
+            #         update_timestamp.update({"sigma.mutate": generation})
+            #     else:
+            #         hyper = hyper_defaults
+
+            # combined update function
+
+            ### global
+
+            # check when the latest update is done
+            if generation - pivot_to_exploration_ts >= explore_time:
+
+                if tuner.noMaxIncrease(logger.logs["max.fitness"], 0, lookback):
+                    update = {
+                        "p.mutate.individual": np.round(np.min([hyper["p.mutate.individual"] + 0.20, 0.5]), 3),
+                        "p.mutate.genome": np.round(np.min([hyper["p.mutate.genome"] + 0.20, 0.5]), 3),
+                        "sigma.mutate": np.round(np.min([hyper["sigma.mutate"] + 0.20, 0.6]), 3),
+                        "tournament.size": np.round(np.min([hyper["tournament.size"] + 4, 10]), 3),
+                    }
+                    hyper.update(**update)
+                    pivot_to_exploration_ts = generation
+                else:
+                    hyper = hyper_defaults
+
+                if tuner.noMeanMaxDifference(max_fitness=logger.logs["max.fitness"], mean_fitness=logger.logs["mean.fitness"], threshold=5, lookback=lookback):
+                    population_w = algo.repopulate(population_w, population_f, frac=0.9)
+                    population_f = evaluate(population_w)
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
@@ -205,15 +248,12 @@ for _ in range(1):
 
 
 if settings["saveLogs"]:
-    printHeaders = True if not os.path.exists(settings["logfile"]) else False
+    with open(settings["logfile"], "w") as f:
+        f.write(",".join([str(x) for x in logger.headers]) + "\n")
 
     # Write to file
-    with open(settings["logfile"], "a+") as f:
-
+    with open(settings["logfile"], "a") as f:
         log_length = max(len(values) for values in logger.logs.values())
-
-        if printHeaders:
-            f.write(",".join([str(x) for x in logger.headers]) + "\n")
 
         for i in range(log_length):
             line = [str(logger.logs[key][i]) for key in logger.logs.keys()]
