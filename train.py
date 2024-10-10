@@ -103,12 +103,18 @@ hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_we
 
 tuner = Tuner(hyperparameters=hyper)
 
+lookback = 12
+
+update_timestamp = {
+    "increase.mutation": 0,
+    "repopulate": 0,
+}
+
 ##############################
 ##### Start Simulation
 ##############################
 
 algo = Ga()
-
 
 for _ in range(1):
 
@@ -127,7 +133,7 @@ for _ in range(1):
 
     log.update(
         {
-            "run id": dt.datetime.today().strftime("%H:%M"),
+            "run id": dt.datetime.today().strftime("%M:%S"),
             "generation": 0,
             "set of enemies  ": " ".join(str(e) for e in env.enemies),
             **calc_statistics(population_f),
@@ -143,7 +149,7 @@ for _ in range(1):
         parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
 
         # CROSSOVER
-        offspring_w = algo.crossover_2_offspring(parents_w, p=hyper["p.reproduce"])
+        offspring_w = algo.crossover_n_offspring(parents_w, hyper["n.offspring"])
 
         # MUTATION
         offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
@@ -171,19 +177,24 @@ for _ in range(1):
 
         log.update({"generation": generation, **calc_statistics(population_f)})
 
-
-
         logger.save_log(log)
 
-        ## Apply tuning Logic
-        
+        if generation >= lookback:
+            # conditions
+            can_update_sigma = generation - update_timestamp["increase.mutation"] > lookback
 
-        # lookback = 3
+            if tuner.noMaxIncrease(logger.logs["max.fitness"], 10, lookback) & can_update_sigma:
+                update_timestamp["increase.mutation"] = generation
+                new_sigma = np.min([hyper["sigma.mutate"] + 0.25, 1])
+                hyper.update({"sigma.mutate": new_sigma})
+                print(f"update sigma to {hyper['sigma.mutate']}")
 
-        # if len(logger.logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
+                # TODO: add maybe more changes
+
+            can_update_repopulate = generation - update_timestamp["repopulate"] > lookback
 
             if tuner.hasStagnated(metrics=logger.logs["max.fitness"], lookback=lookback, threshold=1):
-                new_val = np.min([hyper["population.size"] + 20],200)
+                new_val = np.min([hyper["population.size"] + 20], 200)
                 hyper = tuner.updateHyperparameter(key="population.size", value=new_val, generation=generation, lookback=lookback)
 
             # elif tuner.hasProgressed(metrics=logger.logs["max.fitness"], lookback=lookback, threshold=10):
