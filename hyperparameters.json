@@ -1,12 +1,12 @@
 {
     "n.weights": 265,
-    "population.size": 100,
+    "population.size": 50,
     "n.offspring": 4,
-    "n.generations": 20,
+    "n.generations": 30,
     "p.reproduce": 0.20,
-    "p.mutate.individual": 0.25,
-    "p.mutate.genome": 0.25,
-    "sigma.mutate": 0.10,
-    "tournament.size": 5,
-    "n.best": 2
+    "p.mutate.individual": 0.1,
+    "p.mutate.genome": 0.1,
+    "sigma.mutate": 0.1,
+    "tournament.size": 2,
+    "n.best": 1
 }

@@ -32,7 +32,7 @@ settings = {
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
-enemies = [1, 5, 6, 8]
+enemies = [4, 6, 8]
 
 
 if not settings["showTestRun"]:
@@ -68,14 +68,14 @@ def evaluate(x):
 
 def calc_statistics(fitness: np.array):
     return {
-        "max.fitness": np.round(np.max(fitness), 4),
-        "mean.fitness": np.round(np.mean(fitness), 4),
-        "min.fitness": np.round(np.min(fitness), 4),
-        "std.fitness": np.round(np.std(fitness), 4),
+        "max.gain": np.round(np.max(fitness), 3),
+        "mean.gain": np.round(np.mean(fitness), 3),
+        "min.gain": np.round(np.min(fitness), 3),
+        "std.gain": np.round(np.std(fitness), 3),
     }
 
 
-headers = ["set of enemies  ", "run id", "gen", "max.fitness", "mean.fitness", "min.fitness", "std.fitness", "genotype.dist", "p.indivi", "p.genome", "simga", "tour.size"]
+headers = ["set of enemies  ", "run id", "gen", "max.gain", "mean.gain", "min.gain", "std.gain", "genotype.dist", "p.indivi", "p.genome", "simga", "tour.size"]
 logger = Logger(headers=headers, print=settings["printLogs"])
 
 ##############################
@@ -107,7 +107,7 @@ h.print_log(hyper.values())
 tuner = Tuner(hyperparameters=hyper)
 
 free_period = 10  # period before tuning starts
-explore_time = 10  # how many evolutions does the algo get to test new parameters settings
+explore_time = 7  # how many evolutions does the algo get to test new parameters settings
 lookback = 5  # comparison window
 
 update_timestamp = {k: 0 for k in hyper.keys()}
@@ -209,7 +209,7 @@ for _ in range(1):
             # # check when the latest update is done
             # if can_update["sigma.mutate"]:
 
-            #     if tuner.noMaxIncrease(logger.logs["max.fitness"], 0, lookback):
+            #     if tuner.noMaxIncrease(logger.logs["max.gain"], 0, lookback):
             #         new_sigma = np.min([hyper["sigma.mutate"] + 0.10, 0.6])
             #         hyper.update({"sigma.mutate": new_sigma})
             #         update_timestamp.update({"sigma.mutate": generation})
@@ -223,7 +223,7 @@ for _ in range(1):
             # check when the latest update is done
             if generation - pivot_to_exploration_ts >= explore_time:
 
-                if tuner.noMaxIncrease(logger.logs["max.fitness"], 0, lookback):
+                if tuner.noMaxIncrease(logger.logs["max.gain"], 0, lookback):
                     update = {
                         "p.mutate.individual": np.round(np.min([hyper["p.mutate.individual"] + 0.20, 0.5]), 3),
                         "p.mutate.genome": np.round(np.min([hyper["p.mutate.genome"] + 0.20, 0.5]), 3),
@@ -235,7 +235,7 @@ for _ in range(1):
                 else:
                     hyper = hyper_defaults
 
-                if tuner.noMeanMaxDifference(max_fitness=logger.logs["max.fitness"], mean_fitness=logger.logs["mean.fitness"], threshold=5, lookback=lookback):
+                if tuner.noMeanMaxDifference(max_fitness=logger.logs["max.gain"], mean_fitness=logger.logs["mean.gain"], threshold=5, lookback=lookback):
                     population_w = algo.repopulate(population_w, population_f, frac=0.9)
                     population_f = evaluate(population_w)
 
@@ -274,6 +274,6 @@ env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
 f, p, e, t = env.play(run_best_w)
 
 # print outcome of trainign
-outcome = Logger(["avg.fitness", "avg.playerlife", "avg.enemylife", "avg.time", "avg.gain"])
+outcome = Logger(["avg.gain", "avg.playerlife", "avg.enemylife", "avg.time", "avg.gain"])
 outcome.print_headers()
 outcome.print_log([np.round(x, 2) for x in [f, p, e, t, p - e]])
