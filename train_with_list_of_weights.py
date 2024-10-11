@@ -31,21 +31,16 @@ settings = {
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5 # 265
 
-enemies = [2, 5, 7, 8]
+enemies = [1,2,3,4,5,6,7,8]
                                     # Should equal lenght of 'enemies', and sum to 1
 
-WEIGHTS = [[0.25,0.25,0.25,0.25],
-           [0.35,0.30,0.15,0.20],
-           [0.30,0.15,0.20,0.35],
-           [0.15,0.20,0.35,0.30],
-           [0.20,0.35,0.30,0.15],
-           [0.10,0.10,0.40,0.40],
-           [0.10,0.40,0.40,0.10],
-           [0.40,0.10,0.10,0.40],
-           [0.10,0.40,0.10,0.40],
-           [0.60,0.10,0.10,0.20],
-           [0.10,0.60,0.20,0.10],
-           [0.10,0.20,0.10,0.60]]
+WEIGHTS = [[0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
+           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
+           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
+           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
+           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
+           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
+           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25]]
 
 
 
@@ -120,8 +115,9 @@ for i, weight_list in enumerate(WEIGHTS):
     )
     
     def simulation(x):
-        f, p, e, t = env.play(pcont=x)
-        return f
+        per_enemy_stats, average_stats = env.play(pcont=x)
+        #f, p, e, t = env.play(pcont=x)
+        return average_stats.avg_fitness
 
 
     def evaluate(x):
@@ -221,7 +217,12 @@ for i, weight_list in enumerate(WEIGHTS):
     # Show Test Result
     env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
     env.update_parameter("use_weights", False,)
-    f, p, e, t = env.play(run_best_w)
+    
+    per_enemy_stats, average_stats = env.play(run_best_w)
+    f = average_stats.avg_fitness
+    p = average_stats.avg_player_life
+    e = average_stats.avg_enemy_life
+    t = average_stats.avg_time
 
     # print outcome of trainign
     print(f"\nAFTER TESTING RUN {i} ON {env.enemies}\n")
