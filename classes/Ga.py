@@ -22,7 +22,7 @@ class Ga:
         return np.asarray([np.divide(k - np.mean(x), np.std(x)) for k in x])
 
     @classmethod
-    def minmax(self, x: np.array):
+    def minmax(self, x: np.array, to_range: tuple = (0, 1)):
         mi, ma = np.min(x), np.max(x)
         return np.asarray([np.divide(k - mi, ma - mi) for k in x])
 
@@ -68,9 +68,10 @@ class Ga:
 
         population_size = population.shape[0]
 
-        for i in range(0, population_size, 1):
+        for _ in range(0, population_size, 1):
 
             idx = np.random.randint(0, population_size, tournament_size)
+            print(idx)
 
             fitness_vals = fitness[idx]
 
@@ -150,6 +151,18 @@ class Ga:
 
         return np.asarray(selected)
 
+    def take_survivors(self, population: np.array, fitness: np.array, size: int) -> np.array:
+
+        order = np.argsort(fitness)
+
+        ordered_pop = np.copy(population[order][-size:])
+        ordered_fit = np.copy(fitness[order][-size:])
+
+        assert size == ordered_pop.shape[0], f"ordered_pop does not match population.size, got {ordered_pop.shape[0]} "
+        assert size == ordered_fit.shape[0], f"ordered_pop does not match population.size, got {ordered_fit.shape[0]} "
+
+        return ordered_pop, ordered_fit
+
     ###################
     # MUTATION
     ###################
@@ -157,10 +170,9 @@ class Ga:
     def mutate(self, offspring: np.array, p_mutation: float = 0.5, p_genome: float = 0.5, sigma_mutation: float = 0.3) -> np.array:
 
         for individual in offspring:
-            if np.random.rand() < p_mutation:
-                mutation_dist = np.random.uniform(0, 1, size=offspring.shape[1]) < p_genome
-                individual += mutation_dist * np.random.normal(0, sigma_mutation, size=offspring.shape[1])
-                individual = np.asarray(list(map(lambda x: self.bound(x), individual)))
+            mutation_dist = np.random.uniform(0, 1, size=offspring.shape[1]) < p_genome
+            individual += mutation_dist * np.random.normal(0, sigma_mutation, size=offspring.shape[1])
+            individual = np.asarray(list(map(lambda x: self.bound(x), individual)))
 
         return offspring
 

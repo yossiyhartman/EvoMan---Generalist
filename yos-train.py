@@ -32,7 +32,7 @@ settings = {
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
-enemies = [4, 6, 8]
+enemies = [6, 8]
 
 
 if not settings["showTestRun"]:
