@@ -109,8 +109,8 @@ headers_for_printing = [
     "gen",
     "train_max.fitness",
     "train_max.gain",
-    "train_mean.fitness",
-    "train_mean.gain",
+    "test_max.fitness",
+    "test_max.gain",
 ]
 
 logger = Logger(headers=headers, headers_for_printing=headers_for_printing, print=True)
@@ -130,12 +130,12 @@ WEIGHTS_4 = [[0.25,0.25,0.25,0.25],      # Equal weighting for benchmark
            [0.10,0.10,0.40,0.40],]       # More weight on : 6,8  , Less weight on : 2,3
 
 WEIGHTS_8 = [[0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125],      # Equal weighting for benchmark
-           [0.10, 0.10, 0.10, 0.10, 0.05, 0.05, 0.25, 0.25],                # More weight on : 7,8, Less weight on :
-           [0.10, 0.05, 0.05, 0.10, 0.10, 0.10, 0.25, 0.25],                # More weight on : 7,8, Less weight on :
-           [0.05, 0.10, 0.05, 0.10, 0.10, 0.10, 0.25, 0.25],                # More weight on :  , Less weight on :
-           [0.10, 0.00, 0.10, 0.00, 0.00, 0.05, 0.38, 0.37],                # More weight on :  , Less weight on :
-           [0.00, 0.10, 0.00, 0.10, 0.05, 0.00, 0.38, 0.37],                # More weight on :  , Less weight on :
-           [0.00, 0.00, 0.05, 0.00, 0.10, 0.10, 0.38, 0.37],]               # More weight on :  , Less weight on :
+           [0.10, 0.10, 0.10, 0.10, 0.05, 0.25, 0.05, 0.25],                # More weight on : 6 8,    Less weight on : 5 7
+           [0.10, 0.05, 0.05, 0.10, 0.10, 0.25, 0.10, 0.25],                # More weight on : 6 8,    Less weight on : 4 3
+           [0.05, 0.10, 0.05, 0.10, 0.10, 0.20, 0.20, 0.20],                # More weight on : 6 7 8, Less weight on : 1 3
+           [0.05, 0.15, 0.15, 0.05, 0.15, 0.15, 0.15, 0.15],                # More weight on : -    , Less weight on : 1 4
+           [0.02, 0.14, 0.14, 0.14, 0.14, 0.14, 0.14, 0.14],                # More weight on : -   , Less weight on : 1
+           [0.14, 0.14, 0.14, 0.14, 0.14, 0.14, 0.02, 0.14]]                # More weight on : -  , Less weight on : 7
 
 def check_weights(enemies, weights):
     for i, weight_list in enumerate(weights):
@@ -149,16 +149,25 @@ def check_weights(enemies, weights):
 check_weights(groups_of_4_list[0], WEIGHTS_4)
 check_weights(groups_of_8_list[0], WEIGHTS_8)
 
+# Define best_weights file
+best_weights_file = "best_weights.txt"
 
-
-
+# Check if the file exists
+if os.path.exists(best_weights_file):
+    # If the file exists, read the first line (which should contain the stored max_gain)
+    with open(best_weights_file, "r") as f:
+        stored_max_gain = float(f.readline().strip())
+else:
+    with open(best_weights_file, "r") as f: # Set to a very low number if no file exists
+        stored_max_gain = float(f.readline().strip())  
+        f.write(str(stored_max_gain) + "\n")
 
 
 #### START TRAINING #######
-enemy_set = groups_of_4_list
-enemy_weights_set = WEIGHTS_4
-seed_setting_set = [420,120,60,30]
-run_p_enemy = 5
+enemy_set = groups_of_8_list
+enemy_weights_set = WEIGHTS_8
+seed_setting_set = [420,120] # [420,120,60,30]
+run_p_enemy = 2
 
 for enemies in enemy_set:
 
@@ -219,8 +228,8 @@ for enemies in enemy_set:
                 for generation in range(1, hyper["n.generations"] + 1):
 
                     # PARENT SELECTION
-                    # parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
-                    parents_w, parents_f = algo.tournament_selection(population_w, population_g, hyper["tournament.size"])
+                    parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
+                    # parents_w, parents_f = algo.tournament_selection(population_w, population_g, hyper["tournament.size"])
 
                     # CROSSOVER
                     offspring_w = algo.crossover_n_offspring(parents_w, hyper["n.offspring"])
@@ -233,8 +242,8 @@ for enemies in enemy_set:
                     combined_f, combined_g = evaluate(combined_w, train_env)
 
                     # SURVIVAL SELECTION
-                    # population_w, population_f = algo.take_survivors(combined_w, combined_f, size=hyper["population.size"])
-                    population_w, population_f = algo.take_survivors(combined_w, combined_g, size=hyper["population.size"])
+                    population_w, population_f = algo.take_survivors(combined_w, combined_f, size=hyper["population.size"])
+                    # population_w, population_f = algo.take_survivors(combined_w, combined_g, size=hyper["population.size"])
                     t_population_f, t_population_g = evaluate(population_w, test_env)
 
                     log.update(
@@ -253,6 +262,18 @@ for enemies in enemy_set:
                     # print(f"\ngeneration: {generation}")
                     # print(f"fitness of population: \n {population_f}")
                     # print(f"close by neighbour:\n {close_by}")
+
+                    # Store weights of the individual with the max gain after the last generation
+                    max_gain = np.max(t_population_g)
+                    max_gain_index = np.argmax(t_population_g)  # Index of the individual with max gain
+                    best_individual_weights = population_w[max_gain_index]
+                    
+                    # If the current max_gain_all_gens is greater than the stored one, overwrite the file
+                    if max_gain > stored_max_gain:
+                        with open(best_weights_file, "w") as f:
+                            f.write(f"{max_gain}\n")  # Write the max_gain as the first line
+                            for weight in best_individual_weights:  # Write each weight on a new line
+                                f.write(f"{weight}\n")
 
                 print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
