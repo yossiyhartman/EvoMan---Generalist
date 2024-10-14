@@ -10,9 +10,6 @@ from classes.Ga import Ga
 from classes.Logger import Logger
 from classes.Tuner import Tuner
 
-# seed
-np.random.seed(420)
-
 # notebook settings
 settings = {
     "showTestRun": False,  # Show the training afterwards
@@ -32,23 +29,45 @@ n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5 # 265
 
 enemies = [1,2,3,4,5,6,7,8]
-                                    # Should equal lenght of 'enemies', and sum to 1
 
-WEIGHTS = [[0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
-           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
-           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
-           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
-           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
-           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25],
-           [0.1, 0.1, 0.1, 0.1, 0.05, 0.05, 0.25, 0.25]]
+# Should equal lenght of 'enemies', and sum to 1
+WEIGHTS = [[0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125],
+           [0.10, 0.10, 0.10, 0.10, 0.05, 0.05, 0.25, 0.25],
+           [0.10, 0.05, 0.05, 0.10, 0.10, 0.10, 0.25, 0.25],
+           [0.05, 0.10, 0.05, 0.10, 0.10, 0.10, 0.25, 0.25],
+           [0.10, 0.00, 0.10, 0.00, 0.00, 0.05, 0.38, 0.37],
+           [0.00, 0.10, 0.00, 0.10, 0.05, 0.00, 0.38, 0.37],
+           [0.00, 0.00, 0.05, 0.00, 0.10, 0.10, 0.38, 0.37],]
 
+def check_weights(enemies, weights):
+    for i, weight_list in enumerate(weights):
+        # Ensure weights and enemies have the same length
+        if len(weight_list) != len(enemies):
+            raise ValueError("Length of weights and values must match.")
+        # Ensure weights sum up to 1
+        if not np.isclose(np.sum(weight_list), 1.0, atol=1e-3):
+            raise ValueError(f"Sum of weight values must equal 1, but for list {i} is {np.sum(weight_list)}")
+
+check_weights(enemies, WEIGHTS)
 
 
 if not settings["showTestRun"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 
+def list_mean(lst):
+    return sum(lst) / len(lst)
 
+def list_std(lst):
+    mean = list_mean(lst)
+
+    var_sum = 0
+    for i in lst:
+        var_sum += (i-mean) ** 2
+
+    var = (var_sum / len(lst) -1)
+    
+    return (var ** 0.5)
 
 ##############################
 ##### Initialize Data Tracking
@@ -62,7 +81,6 @@ def calc_statistics(fitness: np.array):
         "min.fitness": np.round(np.min(fitness), 4),
         "std.fitness": np.round(np.std(fitness), 4),
     }
-
 
 headers = ["run id", "generation", "max.fitness", "mean.fitness", "min.fitness", "std.fitness", "set of enemies  "]
 logger = Logger(headers=headers)
@@ -97,143 +115,159 @@ tuner = Tuner(hyperparameters=hyper)
 
 algo = Ga()
 
-weights_gain_results = []
+number_seed_tests = 4
+seed_list = [420,120,60,30]
+
+# Loop to test weight vectors
+weight_results = []
+
 for i, weight_list in enumerate(WEIGHTS):
+    seed_results = []
 
-    env = Environment(
-        experiment_name="./",
-        multiplemode="yes",
-        enemies=enemies,
-        playermode="ai",
-        player_controller=player_controller(n_hidden_neurons),
-        enemymode="static",
-        level=2,
-        speed="fastest",
-        visuals=False,
-        weights=weight_list,
-        use_weights=True,
-    )
+    for seed_idx in range(number_seed_tests):
+        # set specific seed
+        np.random.seed(seed_list[seed_idx])
+
+        env = Environment(
+            experiment_name="./",
+            multiplemode="yes",
+            enemies=enemies,
+            playermode="ai",
+            player_controller=player_controller(n_hidden_neurons),
+            enemymode="static",
+            level=2,
+            speed="fastest",
+            visuals=False,
+            weights=weight_list,
+            use_weights=True,
+        )
+        
+        def simulation(x):
+            per_enemy_stats, average_stats = env.play(pcont=x)
+            #f, p, e, t = env.play(pcont=x)
+            return (average_stats.avg_player_life - average_stats.avg_player_life)
+
+
+        def evaluate(x):
+            return np.array(list(map(lambda y: simulation(y), x)))
+
+        print(2 * "\n" + 7 * "-" + f" run {i} " + 7 * "-", end="\n\n")
+        print(2 * "\n" + 7 * "-" + " Start Evolving " + 7 * "-", end="\n\n")
+        # logger.print_headers()
+
+        run_best_w, run_best_f = [], -100
+
+        # data log
+        log = {h: 0 for h in headers}
+
+        # Initialize population
+        population_w = algo.initialize_population(population_size=hyper["population.size"], n_genomes=hyper["n.weights"])
+        population_f = evaluate(population_w)
+
+        log.update(
+            {
+                "run id": str(f"{i}_" + dt.datetime.today().strftime("%H:%M")),
+                "generation": 0,
+                "set of enemies  ": " ".join(str(e) for e in env.enemies),
+                **calc_statistics(population_f),
+            },
+        )
+
+        logger.save_log(log)  # print values
+
+        # Start Evolving
+        for generation in range(1, hyper["n.generations"] + 1):
+
+            # PARENT SELECTION
+            parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
+
+            # CROSSOVER
+            offspring_w = algo.crossover_2_offspring(parents_w, p=hyper["p.reproduce"])
+
+            # MUTATION
+            offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
+
+            # EVALUATE
+            offspring_f = evaluate(offspring_w)
+
+            n_best_w, n_best_f = np.empty([hyper["n.best"], hyper["n.weights"]]), np.empty([hyper["n.best"], 1])
+
+            if hyper["n.best"] > 0:
+                n_best_w, n_best_f, population_w, population_f = algo.eletist_selection(population_w, population_f, hyper["n.best"])
+
+            # COMBINE
+            combined_w = np.vstack((population_w, offspring_w))
+            combined_f = np.append(population_f, offspring_f)
+
+            selected_w, selected_f = algo.survival_selection(combined_w, combined_f, hyper["population.size"] - hyper["n.best"])
+
+            population_w = np.vstack((selected_w, n_best_w))
+            population_f = np.append(selected_f, n_best_f)
+
+            best_idx = np.argmax(population_f)
+            run_best_w = population_w[best_idx]
+            run_best_f = population_f[best_idx]
+
+            log.update({"generation": generation, **calc_statistics(population_f)})
+
+            logger.save_log(log)
+
+            # Apply tuning Logic
+
+            # diversity = 0
+            # for i in range(population_w.shape[1]):
+            #     diversity += np.std(population_w[:, i])
+            # print("DIVERSITY:", diversity)
+
+            # lookback = 3
+
+            # if len(logger.logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
+
+            #     if tuner.hasProgressed(name="max.fitness", metrics=logger.logs["max.fitness"], lookback=lookback, threshold=10):
+            #         new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
+            #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+
+            #     else:
+            #         new_val = np.min([hyper["sigma.mutate"] + 0.10, 1.5])
+            #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
+
+            #     if tuner.diversity_low(population_w, 160):
+            #         new_val = hyper["p.reproduce"] + 0.1
+            #         hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
+
+            #     else:
+            #         new_val = hyper["p.reproduce"] - 0.1
+            #         hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
+
+        print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
+
+        
+        # Show Test Result
+        env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
+        env.update_parameter("use_weights", False,)
+        
+        per_enemy_stats, average_stats = env.play(run_best_w)
+        f = average_stats.avg_fitness
+        p = average_stats.avg_player_life
+        e = average_stats.avg_enemy_life
+        t = average_stats.avg_time
+
+        # print outcome of trainign
+        print(f"\nAFTER TESTING RUN {i} ON {env.enemies}\n")
+        outcome = Logger(["avg.fitness", "avg.playerlife", "avg.enemylife", "avg.time", "avg.gain"])
+        outcome.print_headers()
+        outcome.print_log([np.round(x, 2) for x in [f, p, e, t, p - e]])
+
+        seed_results.append(p-e)
     
-    def simulation(x):
-        per_enemy_stats, average_stats = env.play(pcont=x)
-        #f, p, e, t = env.play(pcont=x)
-        return average_stats.avg_fitness
-
-
-    def evaluate(x):
-        return np.array(list(map(lambda y: simulation(y), x)))
-
-    print(2 * "\n" + 7 * "-" + f" run {i} " + 7 * "-", end="\n\n")
-    print(2 * "\n" + 7 * "-" + " Start Evolving " + 7 * "-", end="\n\n")
-    # logger.print_headers()
-
-    run_best_w, run_best_f = [], -100
-
-    # data log
-    log = {h: 0 for h in headers}
-
-    # Initialize population
-    population_w = algo.initialize_population(population_size=hyper["population.size"], n_genomes=hyper["n.weights"])
-    population_f = evaluate(population_w)
-
-    log.update(
-        {
-            "run id": str(f"{i}_" + dt.datetime.today().strftime("%H:%M")),
-            "generation": 0,
-            "set of enemies  ": " ".join(str(e) for e in env.enemies),
-            **calc_statistics(population_f),
-        },
-    )
-
-    logger.save_log(log)  # print values
-
-    # Start Evolving
-    for generation in range(1, hyper["n.generations"] + 1):
-
-        # PARENT SELECTION
-        parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
-
-        # CROSSOVER
-        offspring_w = algo.crossover_2_offspring(parents_w, p=hyper["p.reproduce"])
-
-        # MUTATION
-        offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
-
-        # EVALUATE
-        offspring_f = evaluate(offspring_w)
-
-        n_best_w, n_best_f = np.empty([hyper["n.best"], hyper["n.weights"]]), np.empty([hyper["n.best"], 1])
-
-        if hyper["n.best"] > 0:
-            n_best_w, n_best_f, population_w, population_f = algo.eletist_selection(population_w, population_f, hyper["n.best"])
-
-        # COMBINE
-        combined_w = np.vstack((population_w, offspring_w))
-        combined_f = np.append(population_f, offspring_f)
-
-        selected_w, selected_f = algo.survival_selection(combined_w, combined_f, hyper["population.size"] - hyper["n.best"])
-
-        population_w = np.vstack((selected_w, n_best_w))
-        population_f = np.append(selected_f, n_best_f)
-
-        best_idx = np.argmax(population_f)
-        run_best_w = population_w[best_idx]
-        run_best_f = population_f[best_idx]
-
-        log.update({"generation": generation, **calc_statistics(population_f)})
-
-        logger.save_log(log)
-
-        # Apply tuning Logic
-
-        # diversity = 0
-        # for i in range(population_w.shape[1]):
-        #     diversity += np.std(population_w[:, i])
-        # print("DIVERSITY:", diversity)
-
-        # lookback = 3
-
-        # if len(logger.logs["max.fitness"]) >= lookback and tuner.readyforupdate(generation, lookback):
-
-        #     if tuner.hasProgressed(name="max.fitness", metrics=logger.logs["max.fitness"], lookback=lookback, threshold=10):
-        #         new_val = np.max([hyper["sigma.mutate"] - 0.10, 0.1])
-        #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
-
-        #     else:
-        #         new_val = np.min([hyper["sigma.mutate"] + 0.10, 1.5])
-        #         hyper = tuner.updateHyperparameter(key="sigma.mutate", value=new_val, generation=generation, lookback=lookback)
-
-        #     if tuner.diversity_low(population_w, 160):
-        #         new_val = hyper["p.reproduce"] + 0.1
-        #         hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
-
-        #     else:
-        #         new_val = hyper["p.reproduce"] - 0.1
-        #         hyper = tuner.updateHyperparameter(key="p.reproduce", value=new_val, generation=generation, lookback=lookback)
-
-    print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
-
+    # Store results of weightlist on all seeds
+    gain_avg_result = list_mean(seed_results) 
+    gain_std_result = list_std(seed_results) 
     
-    # Show Test Result
-    env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
-    env.update_parameter("use_weights", False,)
-    
-    per_enemy_stats, average_stats = env.play(run_best_w)
-    f = average_stats.avg_fitness
-    p = average_stats.avg_player_life
-    e = average_stats.avg_enemy_life
-    t = average_stats.avg_time
-
-    # print outcome of trainign
-    print(f"\nAFTER TESTING RUN {i} ON {env.enemies}\n")
-    outcome = Logger(["avg.fitness", "avg.playerlife", "avg.enemylife", "avg.time", "avg.gain"])
-    outcome.print_headers()
-    outcome.print_log([np.round(x, 2) for x in [f, p, e, t, p - e]])
-
-    weights_gain_results.append((i, p-e))
+    weight_results.append((weight_list, gain_avg_result, gain_std_result))
 
 
-print(weights_gain_results)
+print(weight_results)
 
 ##############################
 ##### Post Simulation
