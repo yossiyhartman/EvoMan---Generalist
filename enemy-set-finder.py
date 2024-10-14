@@ -219,7 +219,8 @@ for enemies in enemy_set:
                 for generation in range(1, hyper["n.generations"] + 1):
 
                     # PARENT SELECTION
-                    parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
+                    # parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
+                    parents_w, parents_f = algo.tournament_selection(population_w, population_g, hyper["tournament.size"])
 
                     # CROSSOVER
                     offspring_w = algo.crossover_n_offspring(parents_w, hyper["n.offspring"])
@@ -232,7 +233,8 @@ for enemies in enemy_set:
                     combined_f, combined_g = evaluate(combined_w, train_env)
 
                     # SURVIVAL SELECTION
-                    population_w, population_f = algo.take_survivors(combined_w, combined_f, size=hyper["population.size"])
+                    # population_w, population_f = algo.take_survivors(combined_w, combined_f, size=hyper["population.size"])
+                    population_w, population_f = algo.take_survivors(combined_w, combined_g, size=hyper["population.size"])
                     t_population_f, t_population_g = evaluate(population_w, test_env)
 
                     log.update(
@@ -254,10 +256,11 @@ for enemies in enemy_set:
 
                 print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
-    # write run to file
-    with open("logs.txt", "a") as f:
-        log_length = max(len(values) for values in logger.logs.values())
-        for i in range(log_length):
-            f.write(",".join([str(logger.logs[key][i]) for key in logger.logs.keys()]) + "\n")
+                # write run to file
+                with open("logs.txt", "a") as f:
+                    log_length = max(len(values) for values in logger.logs.values())
+                    for i in range(log_length):
+                        f.write(",".join([str(logger.logs[key][i]) for key in logger.logs.keys()]) + "\n")
 
-    logger.clean_logs()
+                # clean logs, set only header values
+                logger.clean_logs()
