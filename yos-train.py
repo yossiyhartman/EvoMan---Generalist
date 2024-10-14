@@ -11,13 +11,12 @@ from classes.Logger import Logger
 from classes.Tuner import Tuner
 
 # seed
-np.random.seed(420)
 
 # notebook settings
 settings = {
-    "showTestRun": True,  # Show the training afterwards
+    "showTestRun": False,  # Show the training afterwards
     "saveLogs": False,  # Save the logs to a file named logs
-    "printLogs": True,
+    "printLogs": False,
     "logfile": "./logs.txt",  # where to save the logs
     "saveWeights": False,  # Save the weights to a file named weights
     "weightsfile": "./weights.txt",  # where to save the weights
@@ -54,7 +53,7 @@ env = Environment(
 
 def simulation(x, gain=False):
     f, p, e, t = env.play(pcont=x)
-    return p - e
+    return f
 
 
 def evaluate(x):
@@ -88,7 +87,7 @@ def load_hyperparameters(file: str, n_genomes=None):
         data: dict = json.load(f)
 
         if n_genomes:
-            data.update({"n_genomes": n_genomes})
+            data.update({"n.weights": n_genomes})
 
         return data
 
@@ -140,7 +139,7 @@ for _ in range(1):
             "gen": 0,
             "set of enemies  ": " ".join(str(e) for e in env.enemies),
             **calc_statistics(population_f),
-            "genotype.dist": np.round(tuner.similairWeights(population_w), 3),
+            # "genotype.dist": np.round(tuner.similairWeights(population_w), 3),
             "p.indivi": hyper["p.mutate.individual"],
             "p.genome": hyper["p.mutate.genome"],
             "simga": hyper["sigma.mutate"],
@@ -183,61 +182,66 @@ for _ in range(1):
         run_best_w = population_w[best_idx]
         run_best_f = population_f[best_idx]
 
-        log.update(
-            {
-                "gen": generation,
-                **calc_statistics(population_f),
-                "genotype.dist": np.round(tuner.similairWeights(population_w), 3),
-                "p.indivi": hyper["p.mutate.individual"],
-                "p.genome": hyper["p.mutate.genome"],
-                "simga": hyper["sigma.mutate"],
-                "tour.size": hyper["tournament.size"],
-            }
-        )
+        # log.update(
+        #     {
+        #         "gen": generation,
+        #         **calc_statistics(population_f),
+        #         "genotype.dist": np.round(tuner.similairWeights(population_w), 3),
+        #         "p.indivi": hyper["p.mutate.individual"],
+        #         "p.genome": hyper["p.mutate.genome"],
+        #         "simga": hyper["sigma.mutate"],
+        #         "tour.size": hyper["tournament.size"],
+        #     }
+        # )
 
-        logger.save_log(log)
+        some_threshold = 0.01
+        dist = tuner.similairWeights(population_w)
+        close_by = np.sum(dist < some_threshold, axis=1)
+        print(f"\ngeneration: {generation}")
+        print(f"fitness of population: \n {population_f}")
+        print(f"close by neighbour:\n {close_by}")
 
         # Tuning
 
-        if generation >= free_period:
+        # if generation >= free_period:
 
-            ### per metric
+        ### per metric
 
-            # per metric
-            # can_update = {k: (generation - update_timestamp[k] >= explore_time) for k in update_timestamp.keys()}
+        # per metric
+        # can_update = {k: (generation - update_timestamp[k] >= explore_time) for k in update_timestamp.keys()}
 
-            # # check when the latest update is done
-            # if can_update["sigma.mutate"]:
+        # # check when the latest update is done
+        # if can_update["sigma.mutate"]:
 
-            #     if tuner.noMaxIncrease(logger.logs["max.gain"], 0, lookback):
-            #         new_sigma = np.min([hyper["sigma.mutate"] + 0.10, 0.6])
-            #         hyper.update({"sigma.mutate": new_sigma})
-            #         update_timestamp.update({"sigma.mutate": generation})
-            #     else:
-            #         hyper = hyper_defaults
+        #     if tuner.noMaxIncrease(logger.logs["max.gain"], 0, lookback):
+        #         new_sigma = np.min([hyper["sigma.mutate"] + 0.10, 0.6])
+        #         hyper.update({"sigma.mutate": new_sigma})
+        #         update_timestamp.update({"sigma.mutate": generation})
+        #     else:
+        #         hyper = hyper_defaults
 
-            # combined update function
+        # combined update function
 
-            ### global
+        ### global
 
-            # check when the latest update is done
-            if generation - pivot_to_exploration_ts >= explore_time:
+        # check when the latest update is done
+        # if generation - pivot_to_exploration_ts >= explore_time:
 
-                if tuner.noMaxIncrease(logger.logs["max.gain"], 0, lookback):
-                    update = {
-                        "p.mutate.individual": np.round(np.min([hyper["p.mutate.individual"] + 0.20, 0.5]), 3),
-                        "p.mutate.genome": np.round(np.min([hyper["p.mutate.genome"] + 0.20, 0.5]), 3),
-                        "sigma.mutate": np.round(np.min([hyper["sigma.mutate"] + 0.20, 0.6]), 3),
-                        "tournament.size": np.round(np.min([hyper["tournament.size"] + 4, 10]), 3),
-                    }
-                    hyper.update(**update)
-                    pivot_to_exploration_ts = generation
-                else:
-                    hyper = hyper_defaults
+        #     if tuner.noMaxIncrease(logger.logs["max.gain"], 0, lookback):
+        #         update = {
+        #             "p.mutate.individual": np.round(np.min([hyper["p.mutate.individual"] + 0.20, 0.5]), 3),
+        #             "p.mutate.genome": np.round(np.min([hyper["p.mutate.genome"] + 0.20, 0.5]), 3),
+        #             "sigma.mutate": np.round(np.min([hyper["sigma.mutate"] + 0.20, 0.6]), 3),
+        #             "tournament.size": np.round(np.min([hyper["tournament.size"] + 4, 10]), 3),
+        #         }
+        #         hyper.update(**update)
+        #         pivot_to_exploration_ts = generation
+        #     else:
+        #         hyper = hyper_defaults
 
-                if tuner.noMeanMaxDifference(max_fitness=logger.logs["max.gain"], mean_fitness=logger.logs["mean.gain"], threshold=5, lookback=lookback):
-                    population_w = algo.repopulate(population_w, population_f, frac=0.9)
-                    population_f = evaluate(population_w)
+        #     if tuner.noMeanMaxDifference(max_fitness=logger.logs["max.gain"], mean_fitness=logger.logs["mean.gain"], threshold=5, lookback=lookback):
+        #         population_w = algo.repopulate(population_w, population_f, frac=0.9)
+        #         population_f = evaluate(population_w)
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 

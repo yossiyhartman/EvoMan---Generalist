@@ -47,12 +47,10 @@ class Tuner:
         The weights of all genomes look very similar
             PROBLEM: All individuals in the population look like each other
         """
-
-        distances = []
+        distances = np.zeros(shape=(population.shape[0], population.shape[0]))
 
         for i in range(population.shape[0]):
-            for j in range(i + 1, population.shape[0]):
-                d = np.linalg.norm(np.subtract(population[i], population[j])) / 65
-                distances.append(d)
+            for j in range(population.shape[0]):
+                distances[i, j] = np.linalg.norm(np.subtract(population[i], population[j])) / 65
 
-        return np.mean(distances)
+        return distances

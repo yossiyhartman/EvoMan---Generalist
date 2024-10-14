@@ -71,7 +71,6 @@ class Ga:
         for _ in range(0, population_size, 1):
 
             idx = np.random.randint(0, population_size, tournament_size)
-            print(idx)
 
             fitness_vals = fitness[idx]
 

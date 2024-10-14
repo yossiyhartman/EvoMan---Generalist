@@ -2,14 +2,16 @@ import json
 import os
 import datetime as dt
 import numpy as np
+
 from evoman.environment import Environment
 from demo_controller import player_controller
 
 # Our classes
 from classes.Ga import Ga
 from classes.Logger import Logger
+from classes.Tuner import Tuner
 
-n_hidden_neurons = 2
+n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
 os.environ["SDL_VIDEODRIVER"] = "dummy"
@@ -63,6 +65,9 @@ def load_hyperparameters(file: str, n_genomes=None):
 # Hyper parameters
 hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_weights)
 
+# tuer
+tuner = Tuner(hyperparameters=hyper)
+
 # log file
 headers = [
     "set of enemies  ",
@@ -96,14 +101,18 @@ headers_for_printing = [
     "train_mean.gain",
 ]
 
-logger = Logger(headers=headers, headers_for_printing=headers_for_printing)
+logger = Logger(headers=headers, headers_for_printing=headers_for_printing, print=True)
 
 with open("logs.txt", "w") as f:
     f.write(",".join([str(x).strip() for x in logger.headers]) + "\n")
 
+pairs_list = [[6, 8], [1, 8], [4, 7], [1, 2], [3, 5], [2, 3], [3, 4], [7, 8], [1, 4], [2, 7]]
+trios_list = [[2, 6, 8], [2, 8, 7], [1, 5, 6], [1, 5, 8], [3, 5, 6], [5, 6, 8], [3, 5, 8], [1, 6, 8], [1, 4, 8], [1, 2, 5]]
+groups_of_4_list = [[2, 3, 4, 7], [2, 3, 6, 8], [2, 3, 7, 8], [1, 2, 6, 8], [1, 2, 6, 7], [1, 3, 4, 5], [5, 6, 7, 8], [2, 3, 5, 6], [1, 3, 4, 7], [1, 2, 5, 7]]
+
 #  Training
-enemy_set = [[2, 5]]
-run_p_enemy = 1
+enemy_set = groups_of_4_list
+run_p_enemy = 5
 
 for enemies in enemy_set:
 
@@ -134,6 +143,7 @@ for enemies in enemy_set:
         # Initialize population
         population_w = algo.initialize_population(population_size=hyper["population.size"], n_genomes=hyper["n.weights"], normal=False)
         population_f, population_g = evaluate(population_w, train_env)
+        t_population_f, t_population_g = evaluate(population_w, test_env)
 
         log.update(
             {
@@ -141,6 +151,7 @@ for enemies in enemy_set:
                 "run id": dt.datetime.today().strftime("%M:%S"),
                 "gen": 0,
                 **calc_statistics(fitness=population_f, gain=population_g, prefix="train"),
+                **calc_statistics(fitness=t_population_f, gain=t_population_g, prefix="test"),
             },
         )
 
@@ -164,15 +175,24 @@ for enemies in enemy_set:
 
             # SURVIVAL SELECTION
             population_w, population_f = algo.take_survivors(combined_w, combined_f, size=hyper["population.size"])
+            t_population_f, t_population_g = evaluate(population_w, test_env)
 
             log.update(
                 {
                     "gen": generation,
                     **calc_statistics(fitness=population_f, gain=population_g, prefix="train"),
+                    **calc_statistics(fitness=t_population_f, gain=t_population_g, prefix="test"),
                 }
             )
 
             logger.save_log(log)
+
+            # some_threshold = 0.01
+            # dist = tuner.similairWeights(population_w)
+            # close_by = np.sum(dist < some_threshold, axis=1)
+            # print(f"\ngeneration: {generation}")
+            # print(f"fitness of population: \n {population_f}")
+            # print(f"close by neighbour:\n {close_by}")
 
         print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
