@@ -80,7 +80,6 @@ tuner = Tuner(hyperparameters=hyper)
 headers = [
     "set of enemies",
     "enemy_weights",
-    "seed_setting",
     "run id",
     "gen",
     "train_max.fitness",
@@ -104,7 +103,6 @@ headers = [
 headers_for_printing = [
     "set of enemies",
     "enemy_weights",
-    "seed_setting",
     "run id",
     "gen",
     "train_max.fitness",
@@ -113,7 +111,7 @@ headers_for_printing = [
     "test_max.gain",
 ]
 
-logger = Logger(headers=headers, headers_for_printing=headers_for_printing, print=True)
+logger = Logger(headers=headers, headers_for_printing=headers_for_printing, print=False)
 
 with open("logs.txt", "w") as f:
     f.write(",".join([str(x).strip() for x in logger.headers]) + "\n")
@@ -129,14 +127,16 @@ WEIGHTS_4 = [[0.25,0.25,0.25,0.25],      # Equal weighting for benchmark
            [0.40,0.40,0.10,0.10],        # More weight on : 2,3  , Less weight on : 6,8
            [0.10,0.10,0.40,0.40],]       # More weight on : 6,8  , Less weight on : 2,3
 
-WEIGHTS_8 = [[0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125],      # Equal weighting for benchmark
-           [0.10, 0.10, 0.10, 0.10, 0.05, 0.25, 0.05, 0.25],                # More weight on : 6 8,    Less weight on : 5 7
-           [0.10, 0.05, 0.05, 0.10, 0.10, 0.25, 0.10, 0.25],                # More weight on : 6 8,    Less weight on : 4 3
-           [0.05, 0.10, 0.05, 0.10, 0.10, 0.20, 0.20, 0.20],                # More weight on : 6 7 8, Less weight on : 1 3
-           [0.05, 0.15, 0.15, 0.05, 0.15, 0.15, 0.15, 0.15],                # More weight on : -    , Less weight on : 1 4
-           [0.02, 0.14, 0.14, 0.14, 0.14, 0.14, 0.14, 0.14],                # More weight on : -   , Less weight on : 1
-           [0.14, 0.14, 0.14, 0.14, 0.14, 0.14, 0.02, 0.14]]                # More weight on : -  , Less weight on : 7
-
+WEIGHTS_8 = [[0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125],     # Equal weighting for benchmark
+             [0.05, 0.20, 0.20, 0.05, 0.05, 0.20, 0.05, 0.20],
+             [0.0, 0.25, 0.25, 0.0, 0.0, 0.25, 0.0, 0.25], 
+        #    [0.10, 0.10, 0.10, 0.10, 0.05, 0.25, 0.05, 0.25],                # More weight on : 6 8,    Less weight on : 5 7
+        #    [0.10, 0.05, 0.05, 0.10, 0.10, 0.25, 0.10, 0.25],                # More weight on : 6 8,    Less weight on : 4 3
+        #    [0.05, 0.10, 0.05, 0.10, 0.10, 0.20, 0.20, 0.20],                # More weight on : 6 7 8, Less weight on : 1 3
+        #    [0.05, 0.15, 0.15, 0.05, 0.15, 0.15, 0.15, 0.15],                # More weight on : -    , Less weight on : 1 4
+        #    [0.02, 0.14, 0.14, 0.14, 0.14, 0.14, 0.14, 0.14],                # More weight on : -   , Less weight on : 1
+        #    [0.14, 0.14, 0.14, 0.14, 0.14, 0.14, 0.02, 0.14]                # More weight on : -  , Less weight on : 7
+]
 def check_weights(enemies, weights):
     for i, weight_list in enumerate(weights):
         # Ensure weights and enemies have the same length
@@ -150,7 +150,7 @@ check_weights(groups_of_4_list[0], WEIGHTS_4)
 check_weights(groups_of_8_list[0], WEIGHTS_8)
 
 # Define best_weights file
-best_weights_file = "best_weights.txt"
+best_weights_file = "best_weights_8_benchmark.txt"
 
 # Check if the file exists
 if os.path.exists(best_weights_file):
@@ -166,122 +166,135 @@ else:
 #### START TRAINING #######
 enemy_set = groups_of_8_list
 enemy_weights_set = WEIGHTS_8
-seed_setting_set = [420,120] # [420,120,60,30]
-run_p_enemy = 2
+run_p_enemy = 3
+
+np.random.seed(420)
 
 for enemies in enemy_set:
 
     for enemy_weights in enemy_weights_set:
 
-        for seed_setting in seed_setting_set:
+        train_env = Environment(
+            experiment_name="./",
+            multiplemode="yes",
+            enemies=enemies,
+            playermode="ai",
+            player_controller=player_controller(n_hidden_neurons),
+            enemymode="static",
+            level=2,
+            speed="fastest",
+            visuals=False,
+            enemy_weights=enemy_weights,
+            use_enemy_weights=True,
+        )
 
-            # set specific seed
-            np.random.seed(seed_setting)
+        for run in range(run_p_enemy):
 
+            algo = Ga()
 
-            train_env = Environment(
-                experiment_name="./",
-                multiplemode="yes",
-                enemies=enemies,
-                playermode="ai",
-                player_controller=player_controller(n_hidden_neurons),
-                enemymode="static",
-                level=2,
-                speed="fastest",
-                visuals=False,
-                enemy_weights=enemy_weights,
-                use_enemy_weights=True,
+            print(2 * "\n" + 7 * "-" + f" run {run}, for set {enemies}, for weights {enemy_weights}" + 7 * "-", end="\n\n")
+            print(2 * "\n" + 7 * "-" + " Start Evolving " + 7 * "-", end="\n\n")
+
+            logger.print_headers()
+
+            # data log
+            log = {h: 0 for h in headers}
+
+            # Initialize population
+            population_w = algo.initialize_population(population_size=hyper["population.size"], n_genomes=hyper["n.weights"], normal=False)
+            population_f, population_g = evaluate(population_w, train_env)
+            t_population_f, t_population_g = evaluate(population_w, test_env)
+
+            log.update(
+                {
+                    "set of enemies": " ".join(str(e) for e in enemies),
+                    "enemy_weights": " ".join(str(e) for e in enemy_weights),
+                    "run id": dt.datetime.today().strftime("%M:%S"),
+                    "gen": 0,
+                    **calc_statistics(fitness=population_f, gain=population_g, prefix="train"),
+                    **calc_statistics(fitness=t_population_f, gain=t_population_g, prefix="test"),
+                },
             )
 
-            for run in range(run_p_enemy):
+            logger.save_log(log)  # print values
 
-                algo = Ga()
+            # Start Evolving
+            for generation in range(1, hyper["n.generations"] + 1):
 
-                print(2 * "\n" + 7 * "-" + f" run {run}, for set {enemies}, for weights {enemy_weights}, for seed {seed_setting} " + 7 * "-", end="\n\n")
-                print(2 * "\n" + 7 * "-" + " Start Evolving " + 7 * "-", end="\n\n")
+                # PARENT SELECTION
+                parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
+                # parents_w, parents_f = algo.tournament_selection(population_w, population_g, hyper["tournament.size"])
 
-                logger.print_headers()
+                # CROSSOVER
+                offspring_w = algo.crossover_n_offspring(parents_w, hyper["n.offspring"])
 
-                # data log
-                log = {h: 0 for h in headers}
+                # MUTATION
+                offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
 
-                # Initialize population
-                population_w = algo.initialize_population(population_size=hyper["population.size"], n_genomes=hyper["n.weights"], normal=False)
-                population_f, population_g = evaluate(population_w, train_env)
-                t_population_f, t_population_g = evaluate(population_w, test_env)
+                # RE-EVALUATE
+                combined_w = np.vstack((population_w, offspring_w))
+                combined_f, combined_g = evaluate(combined_w, train_env)
 
+                # SURVIVAL SELECTION
+                population_w, population_f = algo.take_survivors(combined_w, combined_f, size=hyper["population.size"])
+                # population_w, population_f = algo.take_survivors(combined_w, combined_g, size=hyper["population.size"])
+                
                 log.update(
                     {
-                        "set of enemies": " ".join(str(e) for e in enemies),
-                        "enemy_weights": " ".join(str(e) for e in enemy_weights),
-                        "seed_setting" : seed_setting,
-                        "run id": dt.datetime.today().strftime("%M:%S"),
-                        "gen": 0,
+                        "gen": generation,
                         **calc_statistics(fitness=population_f, gain=population_g, prefix="train"),
-                        **calc_statistics(fitness=t_population_f, gain=t_population_g, prefix="test"),
-                    },
+                        **calc_statistics(fitness=np.array([0]), gain=np.array([0]), prefix="test")
+                    }
                 )
 
-                logger.save_log(log)  # print values
+                logger.save_log(log)
 
-                # Start Evolving
-                for generation in range(1, hyper["n.generations"] + 1):
+                # some_threshold = 0.01
+                # dist = tuner.similairWeights(population_w)
+                # close_by = np.sum(dist < some_threshold, axis=1)
+                # print(f"\ngeneration: {generation}")
+                # print(f"fitness of population: \n {population_f}")
+                # print(f"close by neighbour:\n {close_by}")
 
-                    # PARENT SELECTION
-                    parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
-                    # parents_w, parents_f = algo.tournament_selection(population_w, population_g, hyper["tournament.size"])
+            
+            # Validate on test set            
+            t_population_f, t_population_g = evaluate(population_w, test_env)
+            
+            # Store weights of the individual with the max gain after the last generation
+            max_gain = np.max(t_population_g)
+            max_gain_index = np.argmax(t_population_g)  # Index of the individual with max gain
+            best_individual_weights = population_w[max_gain_index]
+            
+            # If the current max_gain_all_gens is greater than the stored one, overwrite the file
+            if max_gain > stored_max_gain:
+                stored_max_gain = max_gain
 
-                    # CROSSOVER
-                    offspring_w = algo.crossover_n_offspring(parents_w, hyper["n.offspring"])
+                with open(best_weights_file, "w") as f: # Opens file and clears content immediately
+                    # Write the max_gain as the first line
+                    f.write(f"{max_gain}\n")
 
-                    # MUTATION
-                    offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
+                    # Write each weight on a new line
+                    for weight in best_individual_weights:  
+                        f.write(f"{weight}\n")
 
-                    # RE-EVALUATE
-                    combined_w = np.vstack((population_w, offspring_w))
-                    combined_f, combined_g = evaluate(combined_w, train_env)
+            
+            log.update(
+                    {
+                        "gen": "validation",
+                        **calc_statistics(fitness=np.array([0]), gain=np.array([0]), prefix="train"),
+                        **calc_statistics(fitness=t_population_f, gain=t_population_g, prefix="test"),
+                    }
+            )
+            logger.save_log(log)
 
-                    # SURVIVAL SELECTION
-                    population_w, population_f = algo.take_survivors(combined_w, combined_f, size=hyper["population.size"])
-                    # population_w, population_f = algo.take_survivors(combined_w, combined_g, size=hyper["population.size"])
-                    t_population_f, t_population_g = evaluate(population_w, test_env)
 
-                    log.update(
-                        {
-                            "gen": generation,
-                            **calc_statistics(fitness=population_f, gain=population_g, prefix="train"),
-                            **calc_statistics(fitness=t_population_f, gain=t_population_g, prefix="test"),
-                        }
-                    )
+            print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
-                    logger.save_log(log)
+            # write run to file
+            with open("logs.txt", "a") as f:
+                log_length = max(len(values) for values in logger.logs.values())
+                for i in range(log_length):
+                    f.write(",".join([str(logger.logs[key][i]) for key in logger.logs.keys()]) + "\n")
 
-                    # some_threshold = 0.01
-                    # dist = tuner.similairWeights(population_w)
-                    # close_by = np.sum(dist < some_threshold, axis=1)
-                    # print(f"\ngeneration: {generation}")
-                    # print(f"fitness of population: \n {population_f}")
-                    # print(f"close by neighbour:\n {close_by}")
-
-                    # Store weights of the individual with the max gain after the last generation
-                    max_gain = np.max(t_population_g)
-                    max_gain_index = np.argmax(t_population_g)  # Index of the individual with max gain
-                    best_individual_weights = population_w[max_gain_index]
-                    
-                    # If the current max_gain_all_gens is greater than the stored one, overwrite the file
-                    if max_gain > stored_max_gain:
-                        with open(best_weights_file, "w") as f:
-                            f.write(f"{max_gain}\n")  # Write the max_gain as the first line
-                            for weight in best_individual_weights:  # Write each weight on a new line
-                                f.write(f"{weight}\n")
-
-                print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
-
-                # write run to file
-                with open("logs.txt", "a") as f:
-                    log_length = max(len(values) for values in logger.logs.values())
-                    for i in range(log_length):
-                        f.write(",".join([str(logger.logs[key][i]) for key in logger.logs.keys()]) + "\n")
-
-                # clean logs, set only header values
-                logger.clean_logs()
+            # clean logs, set only header values
+            logger.clean_logs()
