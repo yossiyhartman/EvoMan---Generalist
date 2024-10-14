@@ -8,5 +8,5 @@
     "p.mutate.genome": 0.35,
     "sigma.mutate": 0.35,
     "tournament.size": 2,
-    "n.best": 1
+    "n.best": 0
 }
