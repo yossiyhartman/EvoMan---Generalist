@@ -115,8 +115,9 @@ tuner = Tuner(hyperparameters=hyper)
 
 algo = Ga()
 
-number_seed_tests = 4
 seed_list = [420,120,60,30]
+number_seed_tests = len(seed_list)
+
 
 # Loop to test weight vectors
 weight_results = []

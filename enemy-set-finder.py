@@ -16,6 +16,7 @@ n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 
+
 test_env = Environment(
     experiment_name="./",
     multiplemode="yes",
@@ -30,7 +31,14 @@ test_env = Environment(
 
 
 def simulation(x, env):
-    f, p, e, t = env.play(pcont=x)
+    #f, p, e, t = env.play(pcont=x)
+
+    per_enemy_stats, average_stats = env.play(pcont=x)
+    f = average_stats.avg_fitness
+    p = average_stats.avg_player_life
+    e = average_stats.avg_enemy_life
+    t = average_stats.avg_time
+    
     return f, p - e
 
 
@@ -70,7 +78,9 @@ tuner = Tuner(hyperparameters=hyper)
 
 # log file
 headers = [
-    "set of enemies  ",
+    "set of enemies",
+    "enemy_weights",
+    "seed_setting",
     "run id",
     "gen",
     "train_max.fitness",
@@ -92,7 +102,9 @@ headers = [
 ]
 
 headers_for_printing = [
-    "set of enemies  ",
+    "set of enemies",
+    "enemy_weights",
+    "seed_setting",
     "run id",
     "gen",
     "train_max.fitness",
@@ -106,100 +118,146 @@ logger = Logger(headers=headers, headers_for_printing=headers_for_printing, prin
 with open("logs.txt", "w") as f:
     f.write(",".join([str(x).strip() for x in logger.headers]) + "\n")
 
-pairs_list = [[6, 8], [1, 8], [4, 7], [1, 2], [3, 5], [2, 3], [3, 4], [7, 8], [1, 4], [2, 7]]
-trios_list = [[2, 6, 8], [2, 8, 7], [1, 5, 6], [1, 5, 8], [3, 5, 6], [5, 6, 8], [3, 5, 8], [1, 6, 8], [1, 4, 8], [1, 2, 5]]
-groups_of_4_list = [[2, 3, 4, 7], [2, 3, 6, 8], [2, 3, 7, 8], [1, 2, 6, 8], [1, 2, 6, 7], [1, 3, 4, 5], [5, 6, 7, 8], [2, 3, 5, 6], [1, 3, 4, 7], [1, 2, 5, 7]]
 
-#  Training
+#### INITIALIZE TRAINING RUN SETTINGS #######
+groups_of_4_list = [[2, 3, 6, 8]]
+groups_of_8_list = [[1,2,3,4,5,6,7,8]]
+
+
+# Should equal lenght of 'enemies', and sum to 1
+WEIGHTS_4 = [[0.25,0.25,0.25,0.25],      # Equal weighting for benchmark
+           [0.40,0.40,0.10,0.10],        # More weight on : 2,3  , Less weight on : 6,8
+           [0.10,0.10,0.40,0.40],]       # More weight on : 6,8  , Less weight on : 2,3
+
+WEIGHTS_8 = [[0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125],      # Equal weighting for benchmark
+           [0.10, 0.10, 0.10, 0.10, 0.05, 0.05, 0.25, 0.25],                # More weight on : 7,8, Less weight on :
+           [0.10, 0.05, 0.05, 0.10, 0.10, 0.10, 0.25, 0.25],                # More weight on : 7,8, Less weight on :
+           [0.05, 0.10, 0.05, 0.10, 0.10, 0.10, 0.25, 0.25],                # More weight on :  , Less weight on :
+           [0.10, 0.00, 0.10, 0.00, 0.00, 0.05, 0.38, 0.37],                # More weight on :  , Less weight on :
+           [0.00, 0.10, 0.00, 0.10, 0.05, 0.00, 0.38, 0.37],                # More weight on :  , Less weight on :
+           [0.00, 0.00, 0.05, 0.00, 0.10, 0.10, 0.38, 0.37],]               # More weight on :  , Less weight on :
+
+def check_weights(enemies, weights):
+    for i, weight_list in enumerate(weights):
+        # Ensure weights and enemies have the same length
+        if len(weight_list) != len(enemies):
+            raise ValueError("Length of weights and values must match.")
+        # Ensure weights sum up to 1
+        if not np.isclose(np.sum(weight_list), 1.0, atol=1e-3):
+            raise ValueError(f"Sum of weight values must equal 1, but for list {i} is {np.sum(weight_list)}")
+
+check_weights(groups_of_4_list[0], WEIGHTS_4)
+check_weights(groups_of_8_list[0], WEIGHTS_8)
+
+
+
+
+
+
+#### START TRAINING #######
 enemy_set = groups_of_4_list
+enemy_weights_set = WEIGHTS_4
+seed_setting_set = [420,120,60,30]
 run_p_enemy = 5
 
 for enemies in enemy_set:
 
-    train_env = Environment(
-        experiment_name="./",
-        multiplemode="yes",
-        enemies=enemies,
-        playermode="ai",
-        player_controller=player_controller(n_hidden_neurons),
-        enemymode="static",
-        level=2,
-        speed="fastest",
-        visuals=False,
-    )
+    for enemy_weights in enemy_weights_set:
 
-    for run in range(run_p_enemy):
+        for seed_setting in seed_setting_set:
 
-        algo = Ga()
+            # set specific seed
+            np.random.seed(seed_setting)
 
-        print(2 * "\n" + 7 * "-" + f" run {run}, for set {enemies} " + 7 * "-", end="\n\n")
-        print(2 * "\n" + 7 * "-" + " Start Evolving " + 7 * "-", end="\n\n")
 
-        logger.print_headers()
-
-        # data log
-        log = {h: 0 for h in headers}
-
-        # Initialize population
-        population_w = algo.initialize_population(population_size=hyper["population.size"], n_genomes=hyper["n.weights"], normal=False)
-        population_f, population_g = evaluate(population_w, train_env)
-        t_population_f, t_population_g = evaluate(population_w, test_env)
-
-        log.update(
-            {
-                "set of enemies  ": " ".join(str(e) for e in train_env.enemies),
-                "run id": dt.datetime.today().strftime("%M:%S"),
-                "gen": 0,
-                **calc_statistics(fitness=population_f, gain=population_g, prefix="train"),
-                **calc_statistics(fitness=t_population_f, gain=t_population_g, prefix="test"),
-            },
-        )
-
-        logger.save_log(log)  # print values
-
-        # Start Evolving
-        for generation in range(1, hyper["n.generations"] + 1):
-
-            # PARENT SELECTION
-            parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
-
-            # CROSSOVER
-            offspring_w = algo.crossover_n_offspring(parents_w, hyper["n.offspring"])
-
-            # MUTATION
-            offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
-
-            # RE-EVALUATE
-            combined_w = np.vstack((population_w, offspring_w))
-            combined_f, combined_g = evaluate(combined_w, train_env)
-
-            # SURVIVAL SELECTION
-            population_w, population_f = algo.take_survivors(combined_w, combined_f, size=hyper["population.size"])
-            t_population_f, t_population_g = evaluate(population_w, test_env)
-
-            log.update(
-                {
-                    "gen": generation,
-                    **calc_statistics(fitness=population_f, gain=population_g, prefix="train"),
-                    **calc_statistics(fitness=t_population_f, gain=t_population_g, prefix="test"),
-                }
+            train_env = Environment(
+                experiment_name="./",
+                multiplemode="yes",
+                enemies=enemies,
+                playermode="ai",
+                player_controller=player_controller(n_hidden_neurons),
+                enemymode="static",
+                level=2,
+                speed="fastest",
+                visuals=False,
+                enemy_weights=enemy_weights,
+                use_enemy_weights=True,
             )
 
-            logger.save_log(log)
+            for run in range(run_p_enemy):
 
-            # some_threshold = 0.01
-            # dist = tuner.similairWeights(population_w)
-            # close_by = np.sum(dist < some_threshold, axis=1)
-            # print(f"\ngeneration: {generation}")
-            # print(f"fitness of population: \n {population_f}")
-            # print(f"close by neighbour:\n {close_by}")
+                algo = Ga()
 
-        print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
+                print(2 * "\n" + 7 * "-" + f" run {run}, for set {enemies}, for weights {enemy_weights}, for seed {seed_setting} " + 7 * "-", end="\n\n")
+                print(2 * "\n" + 7 * "-" + " Start Evolving " + 7 * "-", end="\n\n")
 
-        # write run to file
-        with open("logs.txt", "a") as f:
-            log_length = max(len(values) for values in logger.logs.values())
-            for i in range(log_length):
-                f.write(",".join([str(logger.logs[key][i]) for key in logger.logs.keys()]) + "\n")
+                logger.print_headers()
 
-        logger.clean_logs()
+                # data log
+                log = {h: 0 for h in headers}
+
+                # Initialize population
+                population_w = algo.initialize_population(population_size=hyper["population.size"], n_genomes=hyper["n.weights"], normal=False)
+                population_f, population_g = evaluate(population_w, train_env)
+                t_population_f, t_population_g = evaluate(population_w, test_env)
+
+                log.update(
+                    {
+                        "set of enemies": " ".join(str(e) for e in enemies),
+                        "enemy_weights": " ".join(str(e) for e in enemy_weights),
+                        "seed_setting" : seed_setting,
+                        "run id": dt.datetime.today().strftime("%M:%S"),
+                        "gen": 0,
+                        **calc_statistics(fitness=population_f, gain=population_g, prefix="train"),
+                        **calc_statistics(fitness=t_population_f, gain=t_population_g, prefix="test"),
+                    },
+                )
+
+                logger.save_log(log)  # print values
+
+                # Start Evolving
+                for generation in range(1, hyper["n.generations"] + 1):
+
+                    # PARENT SELECTION
+                    parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
+
+                    # CROSSOVER
+                    offspring_w = algo.crossover_n_offspring(parents_w, hyper["n.offspring"])
+
+                    # MUTATION
+                    offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
+
+                    # RE-EVALUATE
+                    combined_w = np.vstack((population_w, offspring_w))
+                    combined_f, combined_g = evaluate(combined_w, train_env)
+
+                    # SURVIVAL SELECTION
+                    population_w, population_f = algo.take_survivors(combined_w, combined_f, size=hyper["population.size"])
+                    t_population_f, t_population_g = evaluate(population_w, test_env)
+
+                    log.update(
+                        {
+                            "gen": generation,
+                            **calc_statistics(fitness=population_f, gain=population_g, prefix="train"),
+                            **calc_statistics(fitness=t_population_f, gain=t_population_g, prefix="test"),
+                        }
+                    )
+
+                    logger.save_log(log)
+
+                    # some_threshold = 0.01
+                    # dist = tuner.similairWeights(population_w)
+                    # close_by = np.sum(dist < some_threshold, axis=1)
+                    # print(f"\ngeneration: {generation}")
+                    # print(f"fitness of population: \n {population_f}")
+                    # print(f"close by neighbour:\n {close_by}")
+
+                print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
+
+    # write run to file
+    with open("logs.txt", "a") as f:
+        log_length = max(len(values) for values in logger.logs.values())
+        for i in range(log_length):
+            f.write(",".join([str(logger.logs[key][i]) for key in logger.logs.keys()]) + "\n")
+
+    logger.clean_logs()

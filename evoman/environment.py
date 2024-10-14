@@ -64,8 +64,8 @@ class Environment(object):
         enemy_controller=None,  # controller object
         use_joystick=False,
         visuals=False,
-        weights=[],
-        use_weights=False,
+        enemy_weights=[],
+        use_enemy_weights=False,
     ):
 
         # initializes parameters
@@ -96,8 +96,8 @@ class Environment(object):
 
         self.visuals = visuals
 
-        self.weights = weights
-        self.use_weights = use_weights
+        self.enemy_weights = enemy_weights
+        self.use_enemy_weights = use_enemy_weights
 
         self.enemyImports = {e: __import__("evoman.enemy" + str(e), fromlist=["enemy" + str(e)]) for e in self.enemies}
 
@@ -399,7 +399,7 @@ class Environment(object):
     
     # ALTERNATIVE fitness function for consolidating solutions among multiple games
     def cons_multi2(self, values):
-        weights = np.array(self.weights)  # Assuming weights are stored in the class as self.weights
+        weights = np.array(self.enemy_weights)  # Assuming enemy_weights are stored in the class as self.enemy_weights
         values = np.array(values)  # Convert values to a numpy array for easier computation
 
         # Ensure weights and values have the same length
@@ -611,7 +611,7 @@ class Environment(object):
             venemylife.append(enemylife)
             vtime.append(time)
 
-        if self.use_weights:
+        if self.use_enemy_weights:
             avg_fitness = self.cons_multi2(numpy.array(vfitness))
             avg_player_life = self.cons_multi2(numpy.array(vplayerlife))
             avg_enemy_life = self.cons_multi2(numpy.array(venemylife))
