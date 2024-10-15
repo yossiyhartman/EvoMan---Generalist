@@ -32,7 +32,7 @@ n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
 # enemies = [3, 5, 6, 8]
-enemies = [2, 3, 5, 6, 8]
+enemies = [1, 2, 3, 4, 5, 6, 7, 8]
 
 
 if not settings["showTestRun"]:
@@ -87,7 +87,7 @@ explore_time = 10  # how many evolutions does the algo get to test new parameter
 # updates
 update_ts = 0
 update_step = 0
-updates = [(0.35, 0.35, 4), (0.50, 0.35, 6), (0.65, 0.35, 6), (0.65, 0.55, 8)]
+updates = [(0.35, 0.35, 4), (0.50, 0.50, 6), (0.65, 0.65, 6), (0.75, 0.75, 6)]
 
 # log file
 headers = [
@@ -189,6 +189,7 @@ for generation in range(1, hyper["n.generations"] + 1):
 
     # Tuning
     if generation >= free_period:
+
         if generation - update_ts >= explore_time:
             if tuner.noProgress(logger.get("champ.gain"), threshold=0, lookback=13):
                 phase = "exploring"
