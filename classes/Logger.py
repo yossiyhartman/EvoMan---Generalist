@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class Logger:
     def __init__(self, headers, print=True) -> None:
 
@@ -10,6 +13,9 @@ class Logger:
 
         # Turn off if you don't want a print
         self.print = print
+
+    def get(self, log: str) -> np.array:
+        return np.asarray(self.logs[log])
 
     def print_headers(self):
         if self.print:

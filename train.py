@@ -14,11 +14,11 @@ from classes.Tuner import Tuner
 
 # notebook settings
 settings = {
-    "showTestRun": False,  # Show the training afterwards
-    "saveLogs": False,  # Save the logs to a file named logs
+    "showTestRun": True,  # Show the training afterwards
+    "saveLogs": True,  # Save the logs to a file named logs
     "printLogs": True,
     "logfile": "./logs.txt",  # where to save the logs
-    "saveWeights": False,  # Save the weights to a file named weights
+    "saveWeights": True,  # Save the weights to a file named weights
     "weightsfile": "./weights.txt",  # where to save the weights
 }
 
@@ -31,7 +31,8 @@ settings = {
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
 
-enemies = [5, 6, 8]
+# enemies = [3, 5, 6, 8]
+enemies = [2, 3, 5, 6, 8]
 
 
 if not settings["showTestRun"]:
@@ -62,18 +63,6 @@ def evaluate(x, env):
     return evaluation[:, 0], evaluation[:, 1], evaluation[:, 2]
 
 
-def calc_statistics(fitness: np.array, gain: np.array, wins: np.array, prefix="train"):
-
-    return {
-        f"{prefix}_max.wins": np.round(np.max(wins), 6),
-        f"{prefix}_mean.wins": np.round(np.mean(wins), 6),
-        f"{prefix}_max.fitness": np.round(np.max(fitness), 6),
-        f"{prefix}_mean.fitness": np.round(np.mean(fitness), 6),
-        f"{prefix}_max.gain": np.round(np.max(gain), 6),
-        f"{prefix}_mean.gain": np.round(np.mean(gain), 6),
-    }
-
-
 def load_hyperparameters(file: str, n_genomes=None):
     with open(file, "r") as f:
         data: dict = json.load(f)
@@ -86,150 +75,142 @@ def load_hyperparameters(file: str, n_genomes=None):
 
 # Hyper parameters
 hyper = load_hyperparameters(file="hyperparameters.json", n_genomes=n_network_weights)
+hyper_defaults = hyper.copy()
 
 # tuner
 tuner = Tuner(hyperparameters=hyper)
 
-free_period = 10  # period before tuning starts
+phase = "Free-period"
+free_period = 15  # period before tuning starts
 explore_time = 10  # how many evolutions does the algo get to test new parameters settings
-lookback = 10  # comparison window
 
-update_timestamp = {k: 0 for k in hyper.keys()}
-pivot_to_exploration_ts = 0
+# updates
+update_ts = 0
+update_step = 0
+updates = [(0.35, 0.35, 4), (0.50, 0.35, 6), (0.65, 0.35, 6), (0.65, 0.55, 8)]
 
 # log file
 headers = [
     "set of enemies  ",
     "run id",
     "gen",
-    "train_max.wins",
+    "champ.fitness",
+    "champ.gain",
+    "champ.wins",
     "train_mean.wins",
-    #
-    "train_max.fitness",
     "train_mean.fitness",
-    #
-    "train_max.gain",
     "train_mean.gain",
-    #
     "genotype.dist",
-    "p.genome",
-    "simga",
-    "tour.size",
+    "p.mutate",
+    "sigma",
+    "offspring",
+    "phase",
 ]
 
 logger = Logger(headers=headers)
 
 algo = Ga()
 
-for _ in range(1):
+print(2 * "\n" + 7 * "-" + " Start Evolving " + 7 * "-", end="\n\n")
+logger.print_headers()
 
-    print(2 * "\n" + 7 * "-" + f" run {_} " + 7 * "-", end="\n\n")
-    print(2 * "\n" + 7 * "-" + " Start Evolving " + 7 * "-", end="\n\n")
-    logger.print_headers()
+run_best_w, run_best_f = [], float("-inf")
 
-    run_best_w, run_best_f = [], float("-inf")
+# data log
+log = {h: 0 for h in headers}
 
-    # data log
-    log = {h: 0 for h in headers}
+# Initialize population
+population_w = algo.initialize_population(population_size=hyper["population.size"], n_genomes=hyper["n.weights"], normal=True)
+population_f, population_g, population_v = evaluate(population_w, env)
 
-    # Initialize population
-    population_w = algo.initialize_population(population_size=hyper["population.size"], n_genomes=hyper["n.weights"], normal=True)
-    population_f, population_g, population_v = evaluate(population_w, env)
+log.update(
+    {
+        "set of enemies  ": " ".join(str(e) for e in env.enemies),
+        "run id": dt.datetime.today().strftime("%M:%S"),
+        "gen": 0,
+        "champ.fitness": 0,
+        "champ.gain": 0,
+        "champ.wins": 0,
+        "train_mean.wins": np.round(np.mean(population_v), 6),
+        "train_mean.fitness": np.round(np.mean(population_f), 6),
+        "train_mean.gain": np.round(np.mean(population_g), 6),
+        "genotype.dist": np.round(np.mean(tuner.similairWeights(population_w)), 6),
+        "p.mutate": hyper["p.mutate.genome"],
+        "sigma": hyper["sigma.mutate"],
+        "offspring": hyper["n.offspring"],
+        "phase": phase,
+    },
+)
+
+logger.save_log(log)  # print values
+
+# Start Evolving
+for generation in range(1, hyper["n.generations"] + 1):
+
+    # PARENT SELECTION
+    parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
+
+    # CROSSOVER
+    offspring_w = algo.crossover_n_offspring(parents_w, hyper["n.offspring"])
+
+    # MUTATION
+    offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
+
+    # RE-EVALUATE
+    combined_w = np.vstack((population_w, offspring_w))
+    combined_f, combined_g, combined_v = evaluate(combined_w, env)
+
+    # SURVIVAL SELECTION
+    population_w, population_f, population_g, population_v = algo.select_survivors_multi_object(combined_w, combined_f, combined_g, combined_v, size=hyper["population.size"])
+
+    run_best_w = population_w[-1]
+    run_best_f = population_f[-1]
+    run_best_g = population_g[-1]
+    run_best_v = population_v[-1]
 
     log.update(
         {
-            "set of enemies  ": " ".join(str(e) for e in env.enemies),
-            "run id": dt.datetime.today().strftime("%M:%S"),
-            "gen": 0,
-            **calc_statistics(population_f, population_g, population_v),
+            "gen": generation,
+            "champ.fitness": np.round(run_best_f, 6),
+            "champ.gain": np.round(run_best_g, 6),
+            "champ.wins": np.round(run_best_v, 6),
+            "train_mean.wins": np.round(np.mean(population_v), 6),
+            "train_mean.fitness": np.round(np.mean(population_f), 6),
+            "train_mean.gain": np.round(np.mean(population_g), 6),
             "genotype.dist": np.round(np.mean(tuner.similairWeights(population_w)), 6),
-            "p.genome": hyper["p.mutate.genome"],
-            "simga": hyper["sigma.mutate"],
-            "tour.size": hyper["tournament.size"],
-        },
+            "p.mutate": hyper["p.mutate.genome"],
+            "sigma": hyper["sigma.mutate"],
+            "offspring": hyper["n.offspring"],
+            "phase": phase,
+        }
     )
 
-    logger.save_log(log)  # print values
-
-    # # Start Evolving
-    # for generation in range(1, hyper["n.generations"] + 1):
-
-    #     # PARENT SELECTION
-    #     parents_w, parents_f = algo.tournament_selection(population_w, population_f, hyper["tournament.size"])
-
-    #     # CROSSOVER
-    #     offspring_w = algo.crossover_n_offspring(parents_w, hyper["n.offspring"])
-
-    #     # MUTATION
-    #     offspring_w = algo.mutate(offspring=offspring_w, p_mutation=hyper["p.mutate.individual"], p_genome=hyper["p.mutate.genome"], sigma_mutation=hyper["sigma.mutate"])
-
-    #     # RE-EVALUATE
-    #     combined_w = np.vstack((population_w, offspring_w))
-    #     combined_f, combined_g, combined_v = evaluate(combined_w, env)
-
-    #     # SURVIVAL SELECTION
-    #     population_w, population_f = algo.take_survivors(combined_w, combined_f, size=hyper["population.size"])
-
-    #     best_idx = np.argmax(population_f)
-    #     run_best_w = population_w[best_idx]
-    #     run_best_f = population_f[best_idx]
-
-    #     log.update(
-    #         {
-    #             "gen": generation,
-    #             **calc_statistics(population_f, population_g, population_v),
-    #             "genotype.dist": np.round(np.mean(tuner.similairWeights(population_w)), 6),
-    #             "p.genome": hyper["p.mutate.genome"],
-    #             "simga": hyper["sigma.mutate"],
-    #             "tour.size": hyper["tournament.size"],
-    #         }
-    #     )
-
-    #     logger.save_log(log)
+    logger.save_log(log)
 
     # Tuning
+    if generation >= free_period:
+        if generation - update_ts >= explore_time:
+            if tuner.noProgress(logger.get("champ.gain"), threshold=0, lookback=13):
+                phase = "exploring"
+                update_ts = generation
+                update_step += 1
 
-    # if generation >= free_period:
+                if update_step == len(updates):
+                    population_w = algo.repopulate(population_w, frac=0.8)
+                    population_f, population_g, population_v = evaluate(population_w, env)
+                else:
+                    hyper.update({"p.mutate.genome": updates[update_step][0]})
+                    hyper.update({"sigma.mutate": updates[update_step][1]})
+                    hyper.update({"n.offspring": updates[update_step][2]})
+            else:
+                phase = "normal"
+                update_step = 0
+                hyper.update({"p.mutate.genome": updates[update_step][0]})
+                hyper.update({"sigma.mutate": updates[update_step][1]})
+                hyper.update({"n.offspring": updates[update_step][2]})
 
-    ### per metric
 
-    # per metric
-    # can_update = {k: (generation - update_timestamp[k] >= explore_time) for k in update_timestamp.keys()}
-
-    # # check when the latest update is done
-    # if can_update["sigma.mutate"]:
-
-    #     if tuner.noMaxIncrease(logger.logs["max.gain"], 0, lookback):
-    #         new_sigma = np.min([hyper["sigma.mutate"] + 0.10, 0.6])
-    #         hyper.update({"sigma.mutate": new_sigma})
-    #         update_timestamp.update({"sigma.mutate": generation})
-    #     else:
-    #         hyper = hyper_defaults
-
-    # combined update function
-
-    ### global
-
-    # check when the latest update is done
-    # if generation - pivot_to_exploration_ts >= explore_time:
-
-    #     if tuner.noMaxIncrease(logger.logs["max.gain"], 0, lookback):
-    #         update = {
-    #             "p.mutate.individual": np.round(np.min([hyper["p.mutate.individual"] + 0.20, 0.5]), 3),
-    #             "p.mutate.genome": np.round(np.min([hyper["p.mutate.genome"] + 0.20, 0.5]), 3),
-    #             "sigma.mutate": np.round(np.min([hyper["sigma.mutate"] + 0.20, 0.6]), 3),
-    #             "tournament.size": np.round(np.min([hyper["tournament.size"] + 4, 10]), 3),
-    #         }
-    #         hyper.update(**update)
-    #         pivot_to_exploration_ts = generation
-    #     else:
-    #         hyper = hyper_defaults
-
-    #     if tuner.noMeanMaxDifference(max_fitness=logger.logs["max.gain"], mean_fitness=logger.logs["mean.gain"], threshold=5, lookback=lookback):
-    #         population_w = algo.repopulate(population_w, population_f, frac=0.9)
-    #         population_f = evaluate(population_w)
-
-    print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
+print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
 
 ##############################
@@ -237,34 +218,34 @@ for _ in range(1):
 ##############################
 
 
-# if settings["saveLogs"]:
-#     with open(settings["logfile"], "w") as f:
-#         f.write(",".join([str(x) for x in logger.headers]) + "\n")
+if settings["saveLogs"]:
+    with open(settings["logfile"], "w") as f:
+        f.write(",".join([str(x) for x in logger.headers]) + "\n")
 
-#     # Write to file
-#     with open(settings["logfile"], "a") as f:
-#         log_length = max(len(values) for values in logger.logs.values())
+    # Write to file
+    with open(settings["logfile"], "a") as f:
+        log_length = max(len(values) for values in logger.logs.values())
 
-#         for i in range(log_length):
-#             line = [str(logger.logs[key][i]) for key in logger.logs.keys()]
-#             f.write(",".join(line) + "\n")
+        for i in range(log_length):
+            line = [str(logger.logs[key][i]) for key in logger.logs.keys()]
+            f.write(",".join(line) + "\n")
 
 
-# if settings["saveWeights"]:
-#     with open(settings["weightsfile"], "w") as f:
-#         f.write("\n".join([str(x) for x in run_best_w]))
+if settings["saveWeights"]:
+    with open(settings["weightsfile"], "w") as f:
+        f.write("\n".join([str(x) for x in run_best_w]))
 
-# # Show Test Run
-# if settings["showTestRun"]:
-#     env.update_parameter("speed", "normal")
-#     env.update_parameter("visuals", "True")
+# Show Test Run
+if settings["showTestRun"]:
+    env.update_parameter("speed", "normal")
+    env.update_parameter("visuals", "True")
 
-# # Show Test Result
-# env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
-# f, p, e, w, t = env.play(run_best_w)
+# Show Test Result
+env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
+f, p, e, t, w, ng, g = env.play(run_best_w)
 
-# # print outcome of trainign
-# outcome_headers = ["wins", "avg.fitness", "avg.playerlife", "avg.enemylife", "avg.time", "avg.gain"]
-# outcome = Logger(headers=outcome_headers, headers_for_printing=outcome_headers)
-# outcome.print_headers()
-# outcome.print_log([np.round(x, 2) for x in [w, f, p, e, t, p - e]])
+# print outcome of trainign
+outcome_headers = ["wins", "sum(gain)", "avg(gain)", "gain", "fitness", "Playerlife", "Enemylife"]
+outcome = Logger(headers=outcome_headers)
+outcome.print_headers()
+outcome.print_log([np.round(x, 2) for x in [w, ng, g, p - e, f, p, e]])

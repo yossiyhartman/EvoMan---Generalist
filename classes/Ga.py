@@ -48,16 +48,15 @@ class Ga:
     # REPOPULATION
     ###################
 
-    def repopulate(self, population: np.array, fitness: np.array, frac: float = 0.75):
+    def repopulate(self, population: np.array, frac: float = 0.75):
 
         _, n_genomes = population.shape
-        order = np.argsort(fitness)
 
         discard_amount = int(np.ceil(population.shape[0] * frac))
 
         new_pop = self.initialize_population(discard_amount, n_genomes)
 
-        return np.vstack((population[order][discard_amount:], new_pop))
+        return np.vstack((population[discard_amount:], new_pop))
 
     ###################
     # SELECTION
@@ -161,6 +160,21 @@ class Ga:
         assert size == ordered_fit.shape[0], f"ordered_pop does not match population.size, got {ordered_fit.shape[0]} "
 
         return ordered_pop, ordered_fit
+
+    def select_survivors_multi_object(self, population: np.array, fitness: np.array, gain: np.array, wins: np.array, size: int) -> np.array:
+
+        # first check the highest wins
+
+        order = sorted(zip(fitness, gain, wins, population), key=lambda sub: (sub[2], sub[1], sub[0]))
+
+        fitness, gain, wins, population = zip(*order)
+
+        return (
+            np.asarray(population[-size:]),
+            np.asarray(fitness[-size:]),
+            np.asarray(gain[-size:]),
+            np.asarray(wins[-size:]),
+        )
 
     ###################
     # MUTATION

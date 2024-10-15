@@ -35,13 +35,6 @@ class Tuner:
         """
         return np.subtract(max_fitness[-1], max_fitness[-lookback]) <= threshold
 
-    def noMeanMaxDifference(self, mean_fitness, max_fitness, threshold: float = 10.0, lookback: int = 0):
-        """
-        The difference between the max fitness and mean fitness is very close together.
-            PROBLEM: All individuals in the population look like each other
-        """
-        return all(np.subtract(max_fitness[-lookback:], mean_fitness[-lookback:]) <= threshold)
-
     def similairWeights(self, population):
         """
         The weights of all genomes look very similar
@@ -54,3 +47,18 @@ class Tuner:
                 distances[i, j] = np.linalg.norm(np.subtract(population[i], population[j])) / 65
 
         return distances
+
+    def noProgress(self, values: np.array, threshold: float = 10.0, lookback: int = 0):
+        """
+        The difference between the max fitness and mean fitness is very close together.
+            PROBLEM: All individuals in the population look like each other
+        """
+
+        return all(np.subtract(values[-lookback:], values[-1]) == 0)
+
+    def noGenotypeDifference(self, geno_diff: np.array, threshold: float = 0.01, lookback: int = 0):
+        """
+        The difference between the max fitness and mean fitness is very close together.
+            PROBLEM: All individuals in the pop§ulation look like each other
+        """
+        return all(geno_diff[-lookback:] <= threshold)
