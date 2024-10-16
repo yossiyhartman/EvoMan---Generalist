@@ -1,0 +1,2 @@
+wins,sum(gain),avg(gain),gain,fitness,Playerlife,Enemylife
+5,3.4,-47.03,9.1,38.99,0.59,-8.51

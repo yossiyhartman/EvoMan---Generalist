@@ -22,7 +22,7 @@ class Ga:
         return np.asarray([np.divide(k - np.mean(x), np.std(x)) for k in x])
 
     @classmethod
-    def minmax(self, x: np.array):
+    def minmax(self, x: np.array, to_range: tuple = (0, 1)):
         mi, ma = np.min(x), np.max(x)
         return np.asarray([np.divide(k - mi, ma - mi) for k in x])
 
@@ -42,22 +42,21 @@ class Ga:
         if normal:
             return np.random.normal(size=(population_size, n_genomes))
         else:
-            return np.random.uniform(low=-1, high=1, size=(population_size, n_genomes))
+            return np.random.uniform(low=-2, high=2, size=(population_size, n_genomes))
 
     ###################
     # REPOPULATION
     ###################
 
-    def repopulate(self, population: np.array, fitness: np.array, frac: float = 0.75):
+    def repopulate(self, population: np.array, frac: float = 0.75):
 
         _, n_genomes = population.shape
-        order = np.argsort(fitness)
 
         discard_amount = int(np.ceil(population.shape[0] * frac))
 
         new_pop = self.initialize_population(discard_amount, n_genomes)
 
-        return np.vstack((population[order][discard_amount:], new_pop))
+        return np.vstack((population[discard_amount:], new_pop))
 
     ###################
     # SELECTION
@@ -68,7 +67,7 @@ class Ga:
 
         population_size = population.shape[0]
 
-        for i in range(0, population_size, 1):
+        for _ in range(0, population_size, 1):
 
             idx = np.random.randint(0, population_size, tournament_size)
 
@@ -150,6 +149,28 @@ class Ga:
 
         return np.asarray(selected)
 
+    def take_survivors(self, population: np.array, fitness: np.array, size: int) -> np.array:
+
+        order = np.argsort(fitness)
+
+        ordered_pop = np.copy(population[order][-size:])
+        ordered_fit = np.copy(fitness[order][-size:])
+
+        assert size == ordered_pop.shape[0], f"ordered_pop does not match population.size, got {ordered_pop.shape[0]} "
+        assert size == ordered_fit.shape[0], f"ordered_pop does not match population.size, got {ordered_fit.shape[0]} "
+
+        return ordered_pop, ordered_fit
+
+    def select_survivors_multi_object(self, population: np.array, fitness: np.array, gain: np.array, wins: np.array, size: int) -> np.array:
+
+        # first check the highest wins
+
+        order = sorted(zip(fitness, gain, wins, population), key=lambda sub: (sub[2], sub[1], sub[0]))
+
+        fitness, gain, wins, population = zip(*order)
+
+        return (np.asarray(population[-size:]), np.asarray(fitness[-size:]), np.asarray(gain[-size:]), np.asarray(wins[-size:]))
+
     ###################
     # MUTATION
     ###################
@@ -157,10 +178,9 @@ class Ga:
     def mutate(self, offspring: np.array, p_mutation: float = 0.5, p_genome: float = 0.5, sigma_mutation: float = 0.3) -> np.array:
 
         for individual in offspring:
-            if np.random.rand() < p_mutation:
-                mutation_dist = np.random.uniform(0, 1, size=offspring.shape[1]) < p_genome
-                individual += mutation_dist * np.random.normal(0, sigma_mutation, size=offspring.shape[1])
-                individual = np.asarray(list(map(lambda x: self.bound(x), individual)))
+            mutation_dist = np.random.uniform(0, 1, size=offspring.shape[1]) < p_genome
+            individual += mutation_dist * np.random.normal(0, sigma_mutation, size=offspring.shape[1])
+            individual = np.asarray(list(map(lambda x: self.bound(x), individual)))
 
         return offspring
 
@@ -189,7 +209,7 @@ class Ga:
 
         return np.asarray(total_offspring)
 
-    def crossover_n_offspring(parents: np.array, n_offspring: int = 4) -> np.array:
+    def crossover_n_offspring(self, parents: np.array, n_offspring: int = 4) -> np.array:
 
         total_offspring = []
 
