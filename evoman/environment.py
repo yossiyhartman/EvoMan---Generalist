@@ -575,9 +575,9 @@ class Environment(object):
 
         vgain = self.cons_multi(numpy.array(vgain))
         ngain = numpy.sum(ngain)
-        wins = numpy.sum(wins)
+        games_won = numpy.sum(wins)
 
-        return vfitness, vplayerlife, venemylife, vtime, wins, ngain, vgain
+        return vfitness, vplayerlife, venemylife, vtime, games_won, ngain, vgain
 
     # checks objective mode
     def play(self, pcont="None", econt="None"):

@@ -15,11 +15,6 @@ from classes.Tuner import Tuner
 # notebook settings
 settings = {
     "showTestRun": False,  # Show the training afterwards
-    "saveLogs": True,  # Save the logs to a file named logs
-    "printLogs": True,
-    "logfile": "./logs.txt",  # where to save the logs
-    "saveWeights": True,  # Save the weights to a file named weights
-    "weightsfile": "./weights.txt",  # where to save the weights
 }
 
 
@@ -28,28 +23,15 @@ settings = {
 ##############################
 
 # Environment Settings
+enemies = [2, 5, 6, 8]
+# enemies = [1, 2, 3, 4, 5, 6, 7, 8]
+
 n_hidden_neurons = 10
 n_network_weights = (20 + 1) * n_hidden_neurons + (n_hidden_neurons + 1) * 5
-
-enemies = [3, 5, 6, 8]
-# enemies = [1, 2, 3, 4, 5, 6, 7, 8]
 
 
 if not settings["showTestRun"]:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
-
-
-env = Environment(
-    experiment_name="./",
-    multiplemode="yes",
-    enemies=enemies,
-    playermode="ai",
-    player_controller=player_controller(n_hidden_neurons),
-    enemymode="static",
-    level=2,
-    speed="fastest",
-    visuals=False,
-)
 
 
 def simulation(x, env):
@@ -80,15 +62,6 @@ hyper_defaults = hyper.copy()
 # tuner
 tuner = Tuner(hyperparameters=hyper)
 
-phase = "Free-period"
-free_period = 15  # period before tuning starts
-explore_time = 10  # how many evolutions does the algo get to test new parameters settings
-
-# updates
-update_ts = 0
-update_step = 0
-updates = [(0.35, 0.35, 4), (0.70, 0.70, 6), (0.7, 1.4, 8)]
-
 # log file
 headers = [
     "set of enemies  ",
@@ -112,11 +85,45 @@ headers = [
     "phase",
 ]
 
+# print outcome of trainign
+outcome_headers = ["wins", "sum(gain)", "avg(gain)", "gain", "fitness", "Playerlife", "Enemylife"]
+
+outcome = Logger(headers=outcome_headers)
 logger = Logger(headers=headers)
+
 
 algo = Ga()
 
 for run in range(5):
+
+    hyper = hyper_defaults.copy()
+
+    phase = "fixed parameters"
+    free_period = 15  # period before tuning starts
+    explore_time = 10  # how many evolutions does the algo get to test new parameters settings
+
+    # updates
+    update_ts = 0
+    update_step = 0
+    updates = [(0.35, 0.35, 4), (0.70, 0.70, 6), (0.7, 1.4, 8)]
+
+    with open(f"logfile_{run}.txt", "w") as f:
+        f.write(",".join([str(x) for x in logger.headers]) + "\n")
+
+    with open(f"outcomesfile_{run}.txt", "w") as f:
+        f.write(",".join([str(x) for x in outcome.headers]) + "\n")
+
+    env = Environment(
+        experiment_name="./",
+        multiplemode="yes",
+        enemies=enemies,
+        playermode="ai",
+        player_controller=player_controller(n_hidden_neurons),
+        enemymode="static",
+        level=2,
+        speed="fastest",
+        visuals=False,
+    )
 
     print(2 * "\n" + 7 * "-" + f" Start Evolving / run {run} " + 7 * "-", end="\n\n")
     logger.print_headers()
@@ -199,67 +206,49 @@ for run in range(5):
 
         logger.save_log(log)
 
-        # TUNER
-        if generation >= free_period:
-            if generation - update_ts >= explore_time:
+        # # TUNER
+        # if generation >= free_period:
+        #     if generation - update_ts >= explore_time:
 
-                if tuner.noProgress(logger.get("champ.gain"), threshold=0, lookback=13):
-                    phase = "Exploring"
-                    update_ts = generation
-                    update_step += 1
+        #         if tuner.noProgress(logger.get("champ.gain"), threshold=0, lookback=13):
+        #             phase = "Exploring"
+        #             update_ts = generation
+        #             update_step += 1
 
-                    if update_step >= 3:
-                        update_step = 0
-                        population_w = algo.repopulate(population_w, frac=0.8)
-                        population_f, population_g, population_v = evaluate(population_w, env)
-                    else:
-                        hyper.update({"p.mutate.genome": updates[update_step][0]})
-                        hyper.update({"sigma.mutate": updates[update_step][1]})
-                        hyper.update({"n.offspring": updates[update_step][2]})
+        #             if update_step >= 3:
+        #                 update_step = 0
+        #                 population_w = algo.repopulate(population_w, frac=0.8)
+        #                 population_f, population_g, population_v = evaluate(population_w, env)
+        #                 hyper.update({"p.mutate.genome": updates[update_step][0]})
+        #                 hyper.update({"sigma.mutate": updates[update_step][1]})
+        #                 hyper.update({"n.offspring": updates[update_step][2]})
+        #             else:
+        #                 hyper.update({"p.mutate.genome": updates[update_step][0]})
+        #                 hyper.update({"sigma.mutate": updates[update_step][1]})
+        #                 hyper.update({"n.offspring": updates[update_step][2]})
 
-                else:
-                    phase = "Exploiting"
-                    update_step = 0
-                    hyper.update({"p.mutate.genome": updates[update_step][0]})
-                    hyper.update({"sigma.mutate": updates[update_step][1]})
-                    hyper.update({"n.offspring": updates[update_step][2]})
+        #         else:
+        #             phase = "Exploiting"
+        #             update_step = 0
+        #             hyper.update({"p.mutate.genome": updates[update_step][0]})
+        #             hyper.update({"sigma.mutate": updates[update_step][1]})
+        #             hyper.update({"n.offspring": updates[update_step][2]})
 
     print(2 * "\n" + 7 * "-" + " Finished Evolving " + 7 * "-", end="\n\n")
 
+    # Show Test Result
+    env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
+    f, p, e, t, w, ng, g = env.play(run_best_w)
 
-##############################
-##### Post Simulation
-##############################
+    with open(f"outcomesfile_{run}.txt", "a") as file:
+        file.write(",".join([str(np.round(x, 2)) for x in [w, ng, g, p - e, f, p, e]]))
 
+    with open(f"weightsfile_{run}.txt", "w") as f:
+        f.write("\n".join([str(x) for x in run_best_w]))
 
-if settings["saveLogs"]:
-    with open(settings["logfile"], "w") as f:
-        f.write(",".join([str(x) for x in logger.headers]) + "\n")
-
-    # Write to file
-    with open(settings["logfile"], "a") as f:
+    with open(f"logfile_{run}.txt", "a") as f:
         log_length = max(len(values) for values in logger.logs.values())
 
         for i in range(log_length):
             line = [str(logger.logs[key][i]) for key in logger.logs.keys()]
             f.write(",".join(line) + "\n")
-
-
-if settings["saveWeights"]:
-    with open(settings["weightsfile"], "w") as f:
-        f.write("\n".join([str(x) for x in run_best_w]))
-
-# Show Test Run
-if settings["showTestRun"]:
-    env.update_parameter("speed", "normal")
-    env.update_parameter("visuals", "True")
-
-# Show Test Result
-env.update_parameter("enemies", [1, 2, 3, 4, 5, 6, 7, 8])
-f, p, e, t, w, ng, g = env.play(run_best_w)
-
-# print outcome of trainign
-outcome_headers = ["wins", "sum(gain)", "avg(gain)", "gain", "fitness", "Playerlife", "Enemylife"]
-outcome = Logger(headers=outcome_headers)
-outcome.print_headers()
-outcome.print_log([np.round(x, 2) for x in [w, ng, g, p - e, f, p, e]])

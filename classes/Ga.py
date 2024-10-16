@@ -169,12 +169,7 @@ class Ga:
 
         fitness, gain, wins, population = zip(*order)
 
-        return (
-            np.asarray(population[-size:]),
-            np.asarray(fitness[-size:]),
-            np.asarray(gain[-size:]),
-            np.asarray(wins[-size:]),
-        )
+        return (np.asarray(population[-size:]), np.asarray(fitness[-size:]), np.asarray(gain[-size:]), np.asarray(wins[-size:]))
 
     ###################
     # MUTATION
